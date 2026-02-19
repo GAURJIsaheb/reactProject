@@ -38,6 +38,7 @@ function App() {
       setBooting(false);
     }
   }
+  
 
   if (booting) {
     return (

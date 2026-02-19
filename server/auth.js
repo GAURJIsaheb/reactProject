@@ -76,7 +76,7 @@ if(!pro){
 
 
 
-/* LOGOUT dummy */
+/* LOGOUT  */
 router.post('/logout', (req, res) => {
   req.session.destroy(() => {
     res.clearCookie('todo.sid');

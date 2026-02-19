@@ -7,8 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 
-import "./login.css";
-
 export default function Login() {
   const { token, setAuth } = useAuthStore();
 
@@ -22,45 +20,70 @@ export default function Login() {
     }
   }, [token]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+ const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    try {
-      setLoading(true);
-      const data = await loginUser({ name, email });
+  const trimmedName = name.trim();
+  const trimmedEmail = email.trim();
 
-     setAuth(data.token, data.user.name, data.user.email);
+  if (!trimmedName) {
+    alert("Name cannot be empty or spaces only");
+    return;
+  }
+
+  if (!trimmedEmail) {
+    alert("Email cannot be empty");
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    const data = await loginUser({
+      name: trimmedName,
+      email: trimmedEmail
+    });
+
+    setAuth(data.token, data.user.name, data.user.email);
     window.location.reload();
 
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (err: any) {
+    alert(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
-    <div className="login-container">
-      <Card className="w-87.5">
+    <div className="min-h-screen flex items-center justify-center bg-[#020617]">
+      <Card className="w-87.5 bg-[#111827] border border-white/10 shadow-2xl rounded-xl">
+        
         <CardHeader>
-          <CardTitle>Welcome back</CardTitle>
+          <CardTitle className="text-center text-white text-xl">
+            Welcome back
+          </CardTitle>
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <Label>Full Name</Label>
+          <form onSubmit={handleLogin} className="space-y-5">
+
+            <div className="space-y-2">
+              <Label className="text-white">Full Name</Label>
               <Input
+                className="text-white"
                 placeholder="Enter name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                onBlur={() => setName(name.trim())}
                 required
               />
             </div>
 
-            <div>
-              <Label>Email</Label>
+            <div className="space-y-2">
+              <Label className="text-white">Email</Label>
               <Input
+               className="text-white"
                 type="email"
                 placeholder="email@example.com"
                 value={email}
@@ -69,9 +92,13 @@ export default function Login() {
               />
             </div>
 
-            <Button className="w-full" disabled={loading}>
+            <Button
+              className="w-full"
+              disabled={loading}
+            >
               {loading ? "Logging..." : "Login"}
             </Button>
+
           </form>
         </CardContent>
       </Card>
