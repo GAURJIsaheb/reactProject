@@ -1,0 +1,273 @@
+/* ===== THEME TOGGLE ===== */
+
+#theme-toggle-btn {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: #1e293b;
+  cursor: pointer;
+  font-size: 20px;
+  z-index: 999;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#theme-toggle-btn:hover {
+  background: #334155;
+}
+
+/* ===== MAIN CONTAINER ===== */
+#todo-container {
+  max-width: 1100px;
+  margin: auto;
+  padding: 20px;
+}
+
+/* ===== TOPBAR ===== */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: #1e293b;
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.topbar select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+  width: auto;
+  margin-top: 0;
+}
+
+.topbar select:focus {
+  border-color: #3b82f6;
+}
+
+/* IMPORTANT: use > to only target DIRECT children, not shadcn buttons inside cards */
+.topbar > button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  background: #3b82f6;
+  color: white;
+  font-weight: bold;
+  font-size: 13px;
+  cursor: pointer;
+  width: auto;
+  margin-top: 0;
+  transition: background 0.2s;
+}
+
+.topbar > button:hover {
+  background: #2563eb;
+}
+
+/* ===== TASK INPUT ===== */
+.task-input {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  align-items: center;
+}
+
+.task-input input:not([type="file"]):not([type="checkbox"]) {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #e2e8f0;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.task-input input:focus {
+  border-color: #3b82f6;
+}
+
+.task-input input::placeholder {
+  color: #475569;
+}
+
+/* Only direct button children of .task-input (clip + Add), NOT nested shadcn buttons */
+.task-input > button {
+  padding: 12px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #3b82f6;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  width: auto !important;
+  margin-top: 0;
+  transition: background 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.task-input > button:hover {
+  background: #2563eb;
+}
+
+/* Clip button */
+.clip-btn {
+  background: #1e293b !important;
+  border: 1px solid #334155 !important;
+  padding: 10px 12px !important;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.clip-btn:hover {
+  background: #334155 !important;
+}
+
+/* ===== TASK LISTS ===== */
+#task-list,
+#completed-task-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 0;
+}
+
+#task-list li,
+#completed-task-list li {
+  background: #1e293b;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  font-size: 14px;
+  color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: border-color 0.2s;
+}
+
+#task-list li:hover {
+  border-color: #3b82f6;
+}
+
+#completed-task-list li {
+  opacity: 0.6;
+  text-decoration: line-through;
+  color: #64748b;
+}
+
+/* ===== SECTION HEADING ===== */
+h3 {
+  color: #94a3b8;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+  margin-top: 8px;
+}
+
+/* ===== COUNT DISPLAYS ===== */
+#local-count,
+#global-count {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #475569;
+  padding: 8px 12px;
+  background: #1e293b;
+  border-radius: 6px;
+  border: 1px solid #334155;
+}
+
+/* ===== DARK THEME VARIANT ===== */
+body.dark {
+  background: #020617;
+}
+
+body.dark .topbar,
+body.dark #task-list li,
+body.dark #completed-task-list li,
+body.dark #local-count,
+body.dark #global-count {
+  background: #0f172a;
+  border-color: #1e293b;
+}
+
+body.dark .task-input input {
+  background: #0f172a;
+  border-color: #1e293b;
+}
+
+/* ===== MISC ===== */
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.task-img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+/* action buttons */
+.task-btn {
+  min-width: 38px;
+  max-width: 60px;
+  width: clamp(38px, 4vw, 60px);
+
+  height: clamp(30px, 3vw, 38px);
+
+  border-radius: 8px;
+  border: none;
+  background: #0062ff;
+  color: #ffffff;
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  transition: 0.18s ease;
+}
+
+/* hover */
+.task-btn:hover {
+  background: #334155;
+  color: white;
+}
+
+/* variants */
+.task-btn.edit:hover {
+  background: #f59e0b;
+}
+
+.task-btn.delete:hover {
+  background: #ef4444;
+}
+
+.task-btn.share:hover {
+  background: #6366f1;
+}
