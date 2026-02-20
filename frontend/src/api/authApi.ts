@@ -1,42 +1,43 @@
-const API_BASE = "http://localhost:4000";
+const API = "http://localhost:4000";
 
-export interface LoginPayload {
-  name: string;
+/* LOGIN */
+export async function loginUser(payload: {
   email: string;
-}
-
-export interface LoginResponse {
-  token: string;
-  user: {
-    name: string;
-    email: string;
-  };
-}
-
-export async function loginUser(payload: LoginPayload): Promise<LoginResponse> {
-  const res = await fetch(`${API_BASE}/auth/login`, {
+  password: string;
+}) {
+  const res = await fetch(`${API}/auth/login`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
   const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Login failed");
 
-  if (!res.ok) {
-    throw new Error(data.error || "Login failed");
-  }
-
+  localStorage.setItem("token", data.token);
   return data;
 }
 
+/* SIGNUP */
+export async function signupUser(payload: {
+  name: string;
+  email: string;
+  password: string;
+}) {
+  const res = await fetch(`${API}/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 
-export function authHeaders() {
-  const token = localStorage.getItem("token");
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Signup failed");
 
-  return {
-    "Content-Type": "application/json",
-    Authorization: "Bearer " + token
-  };
+  localStorage.setItem("token", data.token);
+  return data;
 }
+
+export const authHeaders = (token: string) => ({
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${token}`
+});

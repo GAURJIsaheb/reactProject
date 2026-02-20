@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import { randomUUID } from 'crypto';
 import path from 'path';
 
 import { createServer } from './setup.js';
@@ -171,6 +171,12 @@ app.put('/tasks/:id',  requireAuth,asyncHandler(async (req, res) => {
 app.delete('/tasks/:id',  requireAuth,asyncHandler(async (req, res) => {
 
   const taskId = req.params.id;
+  const result = await db.collection("tasks").updateOne(
+  { taskId },
+  { $set:{ deleted:true, updatedAt:Date.now() } }
+);
+
+console.log(result);
 
   await db.collection("tasks").updateOne(//just mark delete=true-->soft delete
     { taskId },
@@ -196,7 +202,6 @@ app.post('/share', requireAuth, asyncHandler(async (req, res) => {
 
   const sharedTask = await col.findOne({
     taskId,
-    createdBy,
     deleted:false
   });
 
@@ -209,7 +214,7 @@ app.post('/share', requireAuth, asyncHandler(async (req, res) => {
       : "personal_" + toEmail;
 
   const newTask = {
-    taskId: crypto.randomUUID(),
+    taskId:randomUUID(),
     workspaceId,                   
 
     text: sharedTask.text,
@@ -218,7 +223,7 @@ app.post('/share', requireAuth, asyncHandler(async (req, res) => {
     completed:false,
     archived:false,
     deleted:false,
-
+    userEmail: toEmail,  
     createdBy: toEmail,             // receiver becomes owner
     originalOwner: createdBy,
     sharedFromTaskId: taskId,
@@ -236,6 +241,8 @@ app.post('/share', requireAuth, asyncHandler(async (req, res) => {
   // realtime push
   const targetSocket = users.get(toEmail);
   if (targetSocket) {
+    console.log("target socket",targetSocket);
+
     io.to(targetSocket).emit('taskShared', newTask);
   }
 

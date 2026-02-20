@@ -191,7 +191,7 @@ export default function EditTaskDialog({ open, onOpenChange, task, onSave }: Pro
 
     {/* Actions */}
     <div className="flex gap-2.5 mt-1">
-      <button
+      {/* <button
         className="
           flex-1
           py-3.5
@@ -207,7 +207,7 @@ export default function EditTaskDialog({ open, onOpenChange, task, onSave }: Pro
         onClick={() => onOpenChange(false)}
       >
         Cancel
-      </button>
+      </button> */}
 
       <button
         className="
@@ -226,7 +226,9 @@ export default function EditTaskDialog({ open, onOpenChange, task, onSave }: Pro
           active:scale-[0.99]
         "
         onClick={() => {
-          onSave(task.id, text, image);
+          const trimmed = text.trim();
+          if (!trimmed) return;
+          onSave(task.id, trimmed, image);
           onOpenChange(false);
         }}
       >

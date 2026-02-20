@@ -1,10 +1,12 @@
+import type { Task } from "./task";
+
 export interface QueueJob {
   id: string;
   action: "create" | "update" | "delete";
   taskId: string;
-  userEmail: string;
   workspaceType?: string;
-  payload: any;
+  payload?: Partial<Task>;  
   retry: number;
   nextRetry: number;
+  userEmail: string;
 }

@@ -1,11 +1,12 @@
 import { create } from "zustand";
+import { clearAllUserData } from "@/lib/idb";
 
 interface AuthState {
   token: string | null;
   userName: string | null;
   userEmail: string | null;
   setAuth: (token: string, name: string, email: string) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -21,8 +22,14 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ token, userName: name, userEmail: email });
   },
 
-  logout: () => {
+  logout: async () => {
     localStorage.clear();
+
+    //  clear offline DB also
+    await clearAllUserData();
+
     set({ token: null, userName: null, userEmail: null });
+
+    window.location.href = "/login";
   },
 }));
