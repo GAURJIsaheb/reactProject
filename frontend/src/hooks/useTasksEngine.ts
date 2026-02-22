@@ -21,7 +21,8 @@ import {
   apiCreateTask,
   apiUpdateTask,
   apiDeleteTask,
-  apiShare
+  apiShare,
+  fetchFromServer
 } from "./serverCalls"
 
 export function useTasksEngine() {
@@ -45,6 +46,20 @@ export function useTasksEngine() {
   useEffect(() => {
     loadTasks();
   }, [loadTasks]);
+
+
+  //from server
+  useEffect(() => {
+  if (!token || !userEmail) return;
+
+  const sync = async () => {
+    await fetchFromServer(userEmail, workspace, token);
+    await loadTasks(); // refresh UI after server sync
+  };
+
+  sync();
+
+}, [token, userEmail, workspace]);
 
   const reloadTasks = useCallback(async () => {
     if (!userEmail) return;

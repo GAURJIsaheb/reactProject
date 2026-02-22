@@ -60,7 +60,7 @@ export default function HeaderSection({
         <button
           onClick={toggleTheme}
           className="w-9.5 h-9.5 rounded-xl flex items-center justify-center
-          bg-background border border-border text-gray-400
+          bg-background border border-border text-foreground
           hover:bg-white/20 hover:background hover:scale-110 transition"
         >
           {theme === "dark" ? <Moon size={15}/> : <Sun size={15}/>}

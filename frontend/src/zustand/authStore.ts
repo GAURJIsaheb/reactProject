@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { clearAllUserData } from "@/lib/idb";
 
 interface AuthState {
   token: string | null;
@@ -24,9 +23,6 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: async () => {
     localStorage.clear();
-
-    //  clear offline DB also
-    await clearAllUserData();
 
     set({ token: null, userName: null, userEmail: null });
 

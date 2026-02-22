@@ -19,7 +19,10 @@ import TaskSkeleton from "@/pages/Dashboard/TaskSkeleton";
 import TaskCard from "@/components/tasks/TaskCard";
 import ViewTaskDialog from "@/components/tasks/ViewTaskDialog";
 import EditTaskDialog from "@/components/tasks/EditTaskDialog";
-import { socket } from "@/socket/socket";
+
+import SearchBar from "./SearchBar";
+import SortToggle from "./SortToggle";
+import type {SortType } from "./SortToggle";
 
 export default function Dashboard() {
   const [page, setPage] = useState(1);
@@ -31,6 +34,9 @@ export default function Dashboard() {
   const [dragId, setDragId] = useState<string | null>(null);
   const [taskOrder, setTaskOrder] = useState<string[]>([]);
 
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortType>("new");
+
   const { logout, userEmail ,token} = useAuthStore();
   const { tasks, workspace,setWorkspace, createTask, toggleComplete, deleteTask, reloadTasks ,shareTask  } = useTasksEngine();
   const { theme, toggleTheme } = useTheme();
@@ -39,12 +45,25 @@ export default function Dashboard() {
   const fileRef = useRef<HTMLInputElement>(null);
   
 
-    const orderedTasks = taskOrder
+  const orderedTasks = taskOrder
     .map((id) => tasks.find((t) => t.id === id))
     .filter(Boolean) as Task[];
 
-  const activeTasks = orderedTasks.filter((t) => !t.completed);
-  const completedTasks = orderedTasks.filter((t) => t.completed);
+  //  SEARCH FILTER
+  const filtered = orderedTasks.filter((t) =>
+    t.text.toLowerCase().includes(search.toLowerCase())
+  );
+
+    //  SORT
+    const sorted = [...filtered].sort((a, b) => {
+      if (sort === "new") return b.createdAt - a.createdAt;
+      if (sort === "old") return a.createdAt - b.createdAt;
+      if (sort === "az") return a.text.localeCompare(b.text);
+      return 0;
+    });
+
+const activeTasks = sorted.filter((t) => !t.completed);
+const completedTasks = sorted.filter((t) => t.completed);
   const totalPages = Math.ceil(activeTasks.length / PAGE_SIZE);
   const paginatedActive = activeTasks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const handleAdd = async () => {
@@ -135,34 +154,7 @@ export default function Dashboard() {
     if (page > totalPages && totalPages > 0) setPage(totalPages);
   }, [totalPages, page]);
 
-  //receive share task by socket
-    useEffect(() => {
-  if (!userEmail) return;
-
-  socket.on("taskShared", async (task) => {
-    console.log("NEW SHARED TASK RECEIVED:", task);
-
-    await addTask({
-      id: task.taskId,
-      text: task.text,
-      image: task.image,
-      completed: false,
-      archived: false,
-      deleted: false,
-      createdAt: task.createdAt,
-      updatedAt: task.updatedAt,
-      userEmail: task.createdBy,
-      workspaceType: "personal",
-      syncStatus: "synced"
-    });
-
-    reloadTasks();
-  });
-
-  return () => {
-    socket.off("taskShared");
-  };
-}, [userEmail]);
+ 
 
   
 
@@ -188,6 +180,25 @@ export default function Dashboard() {
             total={tasks.length}
           />
 
+          {/* SEARCH + SORT BAR */}
+          <div className="w-full mb-5">
+            <div className="
+              flex flex-col sm:flex-row 
+              items-stretch sm:items-center 
+              gap-3
+            ">
+              {/* search */}
+              <div className="flex-1 min-w-0">
+                <SearchBar value={search} onChange={setSearch} />
+              </div>
+
+              {/* sort */}
+              <div className="shrink-0">
+                <SortToggle sort={sort} setSort={setSort} />
+              </div>
+            </div>
+          </div>
+
           {/* INPUT */}
           <InputSection
             input={input}
@@ -199,7 +210,7 @@ export default function Dashboard() {
 
           {/* ACTIVE TASKS */}
           <div className="flex items-center gap-2.5 mb-3">
-            <span className="text-[10px] tracking-[2px] uppercase text-gray-500 font-bold">
+            <span className="text-[10px] ml-2.5 tracking-[2px] uppercase text-foreground font-bold">
               Active Tasks
             </span>
             <div className="flex-1 h-px bg-linear-to-r from-white/10 to-transparent" />
@@ -215,9 +226,11 @@ export default function Dashboard() {
             }
 
             {!loading && paginatedActive.length === 0 && (
-              <div className="col-span-2 text-center py-12 text-gray-500 text-sm">
-                <div className="text-4xl mb-3">.☘︎ ݁˖</div>
-                <p>No active tasks. Add one above!</p>
+              <div className="col-span-3 flex justify-center  py-12">
+                <div className="text-center text-foreground text-sm">
+                  <div className="text-4xl mb-3">.☘︎ ݁˖</div>
+                  <p>No active tasks. Add one above!</p>
+                </div>
               </div>
             )}
 
@@ -284,17 +297,17 @@ export default function Dashboard() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="w-9.5 h-9.5 rounded-xl flex items-center justify-center bg-white/5 border border-white/15 text-gray-400 hover:bg-indigo-500/20 hover:text-indigo-300 hover:border-indigo-400/40 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                className="w-9.5 h-9.5 rounded-xl flex items-center justify-center bg-card border border-border text-foreground hover:bg-indigo-500/20 hover:text-indigo-300 hover:border-indigo-400/40 disabled:opacity-30 disabled:cursor-not-allowed transition"
               >
                 <ChevronLeft size={16} />
               </button>
-              <span className="px-4 py-1.5 rounded-full text-xs font-mono text-gray-400 bg-white/5 border border-white/10">
+              <span className="px-4 py-1.5 rounded-full text-xs font-mono text-foreground bg-card border border-border">
                 {page} / {totalPages}
               </span>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="w-9.5 h-9.5 rounded-xl flex items-center justify-center bg-white/5 border border-white/15 text-gray-400 hover:bg-indigo-500/20 hover:text-indigo-300 hover:border-indigo-400/40 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                className="w-9.5 h-9.5 rounded-xl flex items-center justify-center bg-card border border-border text-foreground hover:bg-indigo-500/20 hover:text-indigo-300 hover:border-indigo-400/40 disabled:opacity-30 disabled:cursor-not-allowed transition"
               >
                 <ChevronRight size={16} />
               </button>

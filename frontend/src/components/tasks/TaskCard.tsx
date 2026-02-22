@@ -152,7 +152,7 @@ export default function TaskCard({
             `}
           >
             {task.completed && (
-              <span className="text-white text-[11px] font-black leading-none">✓</span>
+              <span className="text-foreground text-[11px] font-black leading-none">✓</span>
             )}
           </div>
         </div>
