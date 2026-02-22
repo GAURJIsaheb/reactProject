@@ -147,7 +147,12 @@ export async function updateQueue(
 }
 
 
-
+export async function clearAllUserData() {
+  const db = await initDB();
+  await db.clear("tasks");
+  await db.clear("syncQueue");
+  await db.clear("user");
+}
 
 //to reduce server call--->if checkbox multiple times toggle ho on offline,,so sbh call server pr na jaayein
 /*

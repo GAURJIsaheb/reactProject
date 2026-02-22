@@ -20,7 +20,7 @@ export default function InputSection({
 
   return (
     <div className="flex items-center gap-2.5 px-3 py-2.5 mb-8 rounded-2xl
-    bg-white/5 border border-white/10 backdrop-blur-xl">
+    bg-white/5 border border-border backdrop-blur-xl">
 
       <input
         ref={fileRef}
@@ -36,7 +36,7 @@ export default function InputSection({
       <button
         onClick={() => fileRef.current?.click()}
         className="w-10 h-10 rounded-xl flex items-center justify-center
-        bg-white/10 border border-white/15 text-gray-400
+        bg-card border border-border text-foreground
         hover:bg-indigo-500/20 hover:text-indigo-300 hover:border-indigo-400/40 transition"
       >
         <Paperclip size={16}/>

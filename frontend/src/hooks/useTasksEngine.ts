@@ -1,201 +1,212 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { initDB } from "@/lib/idb";
+import { useAuthStore } from "@/zustand/authStore";
+import type { Task } from "@/types/task";
+
 import {
-  initDB,
-  addTask,
-  getAllTasks,
-  getTaskById,
-  addToQueue,
-  upsertQueue,
-  removeTaskUpdatesFromQueue
-} from "@/lib/idb";
-import { authHeaders } from "@/api/authApi";
-import { useAuthStore } from "@/store/authStore";
-import { useAuth } from "@/context/AuthContext";
+  loadLocalTasks,
+  getLocalTask,
+  saveLocalTask,
+  deleteLocalTask
+} from "./indexdbLayer";
 
+import {
+  queueCreate,
+  queueUpdate,
+  queueDelete,
+  removeQueueJob
+} from "./taskQueueOps";
 
-export interface Task {
-  id: string;
-  text: string;
-  completed: boolean;
-  archived: boolean;
-  deleted?: boolean;
-  image?: string | null;
-  createdAt: number;
-  updatedAt?: number;
-  userEmail: string;
-  workspaceType: string;
-  syncStatus: "pending" | "synced";
-}
-
-const API_BASE = "http://localhost:3000";
+import {
+  apiCreateTask,
+  apiUpdateTask,
+  apiDeleteTask,
+  apiShare,
+  fetchFromServer
+} from "./serverCalls"
 
 export function useTasksEngine() {
-
-  const { user } = useAuth();
-
-  const reloadTasks = async () => {
-    if (!user) return;
-    const fresh = await getAllTasks(user.email, "personal");
-    setTasks(fresh);
-  };
-
-
-  const { userEmail} = useAuthStore();
+  const { userEmail, token } = useAuthStore();
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [workspace, setWorkspace] = useState(
     localStorage.getItem("workspace") || "personal"
   );
 
-  // INITIAL LOAD
+  /* ---------------- LOAD ---------------- */
+
+  const loadTasks = useCallback(async () => {
+    if (!userEmail) return;
+
+    await initDB();
+    const data = await loadLocalTasks(userEmail, workspace);
+    setTasks(data);
+  }, [userEmail, workspace]);
+
   useEffect(() => {
     loadTasks();
-  }, [workspace]);
+  }, [loadTasks]);
 
-  async function loadTasks() {
+
+  //from server
+  useEffect(() => {
+  if (!token || !userEmail) return;
+
+  const sync = async () => {
+    await fetchFromServer(userEmail, workspace, token);
+    await loadTasks(); // refresh UI after server sync
+  };
+
+  sync();
+
+}, [token, userEmail, workspace]);
+
+  const reloadTasks = useCallback(async () => {
     if (!userEmail) return;
-    await initDB();
-    const data = await getAllTasks(userEmail, workspace);
-    setTasks(data);
-  }
+    const fresh = await loadLocalTasks(userEmail, workspace);
+    setTasks(fresh);
+  }, [userEmail, workspace]);
 
+  /* ---------------- CREATE ---------------- */
 
-
-  // ADD TASK
-  async function createTask(text: string,image?: string | null) {
-      if (!userEmail) {
-    throw new Error("User not authenticated");
-  }
-
-  const email = userEmail;
+  async function createTask(text: string, image?: string | null) {
+    if (!userEmail) throw new Error("User not authenticated");
 
     const task: Task = {
       id: crypto.randomUUID(),
       text,
       completed: false,
       archived: false,
+      deleted: false,
       image: image || null,
       createdAt: Date.now(),
-      userEmail: email,
+      updatedAt: Date.now(),
+      userEmail,
       workspaceType: workspace,
       syncStatus: "pending"
     };
 
-    await addTask(task);
-
-    await addToQueue({
-      id: crypto.randomUUID(),
-      action: "create",
-      taskId: task.id,
-      userEmail,
-      workspaceType: workspace,
-      payload: { text: task.text },
-      retry: 0,
-      nextRetry: Date.now()
-    });
+    await saveLocalTask(task);
+    await queueCreate(task, userEmail, workspace);
 
     setTasks(prev => [...prev, task]);
 
-    // optimistic server push
+    if (!token) return;
+
     try {
-      await fetch(`${API_BASE}/tasks`, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify(task)
-      });
-    } catch {}
+      await apiCreateTask(task, token);
+    } catch {
+      console.log("offline create queued");
+    }
   }
 
-  // TOGGLE COMPLETE
+  /* ---------------- TOGGLE ---------------- */
+
   async function toggleComplete(id: string) {
-      if (!userEmail) {
-        throw new Error("User not authenticated");
-    }
+    if (!userEmail) return;
 
-  const email = userEmail;
-    const task = await getTaskById(id);
+    const task = await getLocalTask(id);
     if (!task) return;
 
-    task.completed = !task.completed;
-    task.syncStatus = "pending";
-    task.updatedAt = Date.now();
+    const updated: Task = {
+      ...task,
+      completed: !task.completed,
+      updatedAt: Date.now(),
+      syncStatus: "pending"
+    };
 
-    await addTask(task);
+    await saveLocalTask(updated);
 
-    await upsertQueue({
-      id: crypto.randomUUID(),
-      action: "update",
-      taskId: id,
-      userEmail:email,
-      payload: { completed: task.completed },
-      retry: 0,
-      nextRetry: Date.now()
-    });
+    const jobId = crypto.randomUUID();
+    await queueUpdate(jobId, id, userEmail, { completed: updated.completed });
 
-    setTasks(prev =>
-      prev.map(t => (t.id === id ? task : t))
-    );
+    setTasks(prev => prev.map(t => (t.id === id ? updated : t)));
+
+    if (!token) return;
+
+    try {
+      await apiUpdateTask(id, { completed: updated.completed }, token);
+
+      await saveLocalTask({ ...updated, syncStatus: "synced" });
+      await removeQueueJob(jobId);
+    } catch {
+      console.log("offline toggle queued");
+    }
   }
 
-  // DELETE
+  /* ---------------- DELETE ---------------- */
+
   async function deleteTask(id: string) {
-    const task = await getTaskById(id);
-    if (!task) return;
+    if (!userEmail) return;
 
-    task.deleted = true;
-    task.syncStatus = "pending";
-
-    await addTask(task);
-    await removeTaskUpdatesFromQueue(id);
-      if (!userEmail) {
-        throw new Error("User not authenticated");
-    }
-
-     const email = userEmail;
-
-    await addToQueue({
-      id: crypto.randomUUID(),
-      action: "delete",
-      taskId: id,
-      userEmail:email,
-      workspaceType: workspace,
-      payload: null,
-      retry: 0,
-      nextRetry: Date.now()
-    });
+    await deleteLocalTask(id);
+    await queueDelete(id, userEmail, workspace);
 
     setTasks(prev => prev.filter(t => t.id !== id));
+
+    if (!token) return;
+
+    try {
+      await apiDeleteTask(id, token);
+    } catch {
+      console.log("offline delete queued");
+    }
   }
 
-  // ARCHIVE
-  async function archiveSelected(selectedIds: string[]) {
-    for (const id of selectedIds) {
-      const task = await getTaskById(id);
-      if (!task) continue;
+  /* ---------------- EDIT ---------------- */
 
-      task.archived = true;
-      task.syncStatus = "pending";
-      task.updatedAt = Date.now();
+  async function editTask(id: string, newText: string, newImage?: string | null) {
+    if (!userEmail) return;
 
-      await addTask(task);
-        if (!userEmail) {
-            throw new Error("User not authenticated");
-        }
+    const task = await getLocalTask(id);
+    if (!task) return;
 
-        const email = userEmail;
+    const updated: Task = {
+      ...task,
+      text: newText,
+      image: newImage !== undefined ? newImage : task.image,
+      updatedAt: Date.now(),
+      syncStatus: "pending"
+    };
 
-      await upsertQueue({
-        id: crypto.randomUUID(),
-        action: "update",
-        taskId: id,
-        userEmail:email,
-        payload: { archived: true },
-        retry: 0,
-        nextRetry: Date.now()
-      });
+    await saveLocalTask(updated);
+
+    const jobId = crypto.randomUUID();
+    await queueUpdate(jobId, id, userEmail, {
+      text: updated.text,
+      image: updated.image
+    });
+
+    setTasks(prev => prev.map(t => (t.id === id ? updated : t)));
+
+    if (!token) return;
+
+    try {
+      await apiUpdateTask(id, {
+        text: updated.text,
+        image: updated.image
+      }, token);
+
+      await saveLocalTask({ ...updated, syncStatus: "synced" });
+      await removeQueueJob(jobId);
+    } catch {
+      console.log("offline edit queued");
     }
+  }
 
-    loadTasks();
+  /* ---------------- SHARE ---------------- */
+
+  async function shareTask(taskId: string, toEmail: string) {
+    if (!token) return;
+
+    const task = await getLocalTask(taskId);
+    if (!task) return;
+
+    try {
+      await apiShare(task, toEmail, token);
+    } catch {
+      console.log("share failed");
+    }
   }
 
   return {
@@ -205,8 +216,9 @@ export function useTasksEngine() {
     createTask,
     toggleComplete,
     deleteTask,
-    archiveSelected,
+    editTask,
     loadTasks,
-    reloadTasks
+    reloadTasks,
+    shareTask
   };
 }

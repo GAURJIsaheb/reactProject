@@ -5,7 +5,7 @@ interface AuthState {
   userName: string | null;
   userEmail: string | null;
   setAuth: (token: string, name: string, email: string) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -21,8 +21,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ token, userName: name, userEmail: email });
   },
 
-  logout: () => {
+  logout: async () => {
     localStorage.clear();
+
     set({ token: null, userName: null, userEmail: null });
+
+    window.location.href = "/login";
   },
 }));

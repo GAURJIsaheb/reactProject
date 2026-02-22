@@ -40,9 +40,9 @@ export default function HeaderSection({
         <select
           value={workspace}
           onChange={(e) => setWorkspace(e.target.value)}
-          className="px-3 py-2 text-[13px] font-semibold rounded-xl
-          bg-white/10 border border-white/20 text-foreground outline-none
-          hover:bg-indigo-500/20 hover:border-indigo-400/40"
+          className="px-2 py-2 text-[13px] font-semibold rounded-xl
+          bg-background border border-border text-foreground outline-none
+          hover:bg-muted hover:border-border"
         >
           <option value="personal">🧑 Personal</option>
           <option value="professional">💼 Professional</option>
@@ -52,7 +52,7 @@ export default function HeaderSection({
       <div className="flex items-center gap-2">
         {userEmail && (
           <div className="px-3 py-1.5 rounded-full text-[11px] max-w-40 truncate
-          bg-indigo-500/15 border border-indigo-400/30 text-indigo-300 font-mono">
+          bg-background border border-border text-foreground font-mono">
             {userEmail}
           </div>
         )}
@@ -60,8 +60,8 @@ export default function HeaderSection({
         <button
           onClick={toggleTheme}
           className="w-9.5 h-9.5 rounded-xl flex items-center justify-center
-          bg-white/10 border border-white/15 text-gray-400
-          hover:bg-white/20 hover:text-white hover:scale-105 transition"
+          bg-background border border-border text-foreground
+          hover:bg-white/20 hover:background hover:scale-110 transition"
         >
           {theme === "dark" ? <Moon size={15}/> : <Sun size={15}/>}
         </button>
