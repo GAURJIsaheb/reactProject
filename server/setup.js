@@ -6,7 +6,7 @@ import session from 'express-session';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import authRoutes from './auth.js';
-import passport from "./passport/passport.js"; // ← change
+import passport from "./passport/passport.js"; 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
