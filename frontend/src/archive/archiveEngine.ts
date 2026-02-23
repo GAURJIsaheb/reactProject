@@ -1,4 +1,4 @@
-
+// useArchiveEngine.ts
 // Core hook for archive/restore logic
 // Offline-first: IndexDB first, then sync to MongoDB
 
@@ -59,8 +59,8 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
       for (let i = 0; i < total; i++) {
         const task = tasks[i];
 
-        // Encrypt task data (strip image for payload size, store separately if needed)
-        const plainData = {
+        // IndexDB ke liye: image bhi encrypt karo (local restore mein kaam aayegi)
+        const idbPayload = await encryptTask({
           id: task.id,
           text: task.text,
           completed: task.completed,
@@ -68,10 +68,19 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
           updatedAt: task.updatedAt,
           userEmail: task.userEmail,
           workspaceType: task.workspaceType,
-          image: task.image, // keep image in encrypted blob
-        };
+          image: task.image,
+        });
 
-        const encryptedPayload = await encryptTask(plainData);
+        // Server ke liye: image hata do — payload chhota rahega (18MB → ~1KB)
+        const serverPayload = await encryptTask({
+          id: task.id,
+          text: task.text,
+          completed: task.completed,
+          createdAt: task.createdAt,
+          updatedAt: task.updatedAt,
+          userEmail: task.userEmail,
+          workspaceType: task.workspaceType,
+        });
 
         const archiveRecord: ArchivedTask = {
           id: task.id,
@@ -79,7 +88,7 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
           workspaceType: task.workspaceType,
           archived: true,
           encrypted: true,
-          encryptedPayload,
+          encryptedPayload: idbPayload, // image wala — IndexDB mein
           archivedAt: Date.now(),
         };
 
@@ -94,7 +103,7 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
           id: task.id,
           userEmail,
           workspaceType: task.workspaceType,
-          encryptedPayload,
+          encryptedPayload: serverPayload, // image nahi — server ke liye
           archivedAt: archiveRecord.archivedAt,
         });
 
