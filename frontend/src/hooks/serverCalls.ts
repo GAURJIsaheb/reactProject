@@ -34,7 +34,7 @@ export async function fetchFromServer(
         deleted: t.deleted,
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,
-        userEmail: t.createdBy,
+        userEmail: userEmail,
         workspaceType: workspace,
         syncStatus: "synced"
       });

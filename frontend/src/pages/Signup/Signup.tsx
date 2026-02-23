@@ -99,8 +99,10 @@ export default function Signup() {
 
       // save user to indexeddb
       await saveUser({
+        userId: data.user.userId,
         email: data.user.email,
         name: data.user.name,
+        lastLoginAt: Date.now()
       });
 
       navigate("/dashboard");

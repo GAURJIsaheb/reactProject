@@ -20,7 +20,7 @@ export async function initDB() {
       }
 
       if (!db.objectStoreNames.contains(STORE_USER)) {
-        db.createObjectStore(STORE_USER, { keyPath: "email" });
+        db.createObjectStore(STORE_USER, { keyPath:"userId" });
       }
 
       if (!db.objectStoreNames.contains(STORE_SYNC)) {
@@ -113,9 +113,14 @@ export async function clearAllArchivedFromDB(userEmail: string) {
 
 
 
-export const saveUser =  async (userData: { email: string; name: string }): Promise<void> => {
+export const saveUser = async (userData: {
+  userId: string;
+  email: string;
+  name: string;
+  lastLoginAt: number;
+}) => {
   const db = await initDB();
-  await db.put(STORE_USER, userData); 
+  await db.put(STORE_USER, userData);
 };
 
 export const getUser = async (

@@ -3,6 +3,7 @@ import { loginUser } from "@/api/authApi";
 import { useAuthStore } from "@/zustand/authStore";
 import { Eye, EyeOff, Anchor } from "lucide-react";
 import { Link } from "react-router-dom";
+import { saveUser, clearAllUserData } from "@/lib/idb";
 
 export default function Login() {
   const { token, setAuth } = useAuthStore();
@@ -32,10 +33,31 @@ export default function Login() {
 
     try {
       setLoading(true);
+
       const data = await loginUser({ email: trimmedEmail, password });
-      setAuth(data.token, data.user.name, data.user.email,data.user.userId);
-      window.location.reload();
-    } catch (err: any) {
+
+      // optional: detect user switch
+      if (data.user.email !== email) {
+        await clearAllUserData(); 
+      }
+
+      // save identity in IndexedDB
+      await saveUser({
+        userId: data.user.userId,
+        email: data.user.email,
+        name: data.user.name,
+        lastLoginAt: Date.now()
+      });
+
+      setAuth(
+        data.token,
+        data.user.name,
+        data.user.email,
+        data.user.userId
+      );
+
+  window.location.reload();
+} catch (err: any) {
       setError(err.message || "Login failed. Please try again.");
     } finally {
       setLoading(false);
