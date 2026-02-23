@@ -22,10 +22,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
-    localStorage.clear();
+    localStorage.removeItem("token");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userEmail");
 
-    set({ token: null, userName: null, userEmail: null });
+    set({ token:null, userName:null, userEmail:null });
 
-    window.location.href = "/login";
+    window.location.href="/login";
   },
 }));

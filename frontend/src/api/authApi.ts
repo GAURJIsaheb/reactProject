@@ -13,8 +13,6 @@ export async function loginUser(payload: {
 
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Login failed");
-
-  localStorage.setItem("token", data.token);
   return data;
 }
 
@@ -32,8 +30,6 @@ export async function signupUser(payload: {
 
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Signup failed");
-
-  localStorage.setItem("token", data.token);
   return data;
 }
 

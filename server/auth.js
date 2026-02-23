@@ -23,7 +23,11 @@ router.post("/signup", async (req, res) => {
   await wsCol.insertOne({ workspaceId: crypto.randomUUID(), type: "personal",      owner: email, members: [email], createdAt: Date.now() });
   await wsCol.insertOne({ workspaceId: crypto.randomUUID(), type: "professional",  owner: email, members: [email], createdAt: Date.now() });
 
-  const token = signToken({ email, name });
+  const token = signToken({
+    email:user.email,
+    name:user.name,
+    userId:user._id.toString()
+  });
   res.json({ token, user: { email, name } });
 });
 
