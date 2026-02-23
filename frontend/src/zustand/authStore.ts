@@ -4,7 +4,8 @@ interface AuthState {
   token: string | null;
   userName: string | null;
   userEmail: string | null;
-  setAuth: (token: string, name: string, email: string) => void;
+  userId: string | null; // ← add
+  setAuth: (token: string, name: string, email: string, userId: string) => void; // ← add userId
   logout: () => Promise<void>;
 }
 
@@ -12,13 +13,15 @@ export const useAuthStore = create<AuthState>((set) => ({
   token: localStorage.getItem("token"),
   userName: localStorage.getItem("userName"),
   userEmail: localStorage.getItem("userEmail"),
+  userId: localStorage.getItem("userId"), // ← add
 
-  setAuth: (token, name, email) => {
+  setAuth: (token, name, email, userId) => {
     localStorage.setItem("token", token);
     localStorage.setItem("userName", name);
     localStorage.setItem("userEmail", email);
+    localStorage.setItem("userId", userId); // ← add
 
-    set({ token, userName: name, userEmail: email });
+    set({ token, userName: name, userEmail: email, userId }); // ← add
   },
 
   logout: async () => {

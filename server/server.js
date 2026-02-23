@@ -50,30 +50,31 @@ app.post('/tasks/bulk-create', requireAuth, asyncHandler(async (req, res) => {
 
 // CREATE
 app.post('/tasks', requireAuth, asyncHandler(async (req, res) => {
-  const { id, text, image, userEmail, workspaceType } = req.body;
+  const { id, text, image, workspaceType } = req.body;
+  const { userId } = req.user; // ← req.body se nahi, req.user se lo
 
-  if (!id || !userEmail)
+  if (!id || !userId)
     return res.status(400).json({ error: 'missing fields' });
 
-  const workspaceId =
-    workspaceType === "professional"
-      ? "pro_" + userEmail
-      : "personal_" + userEmail;
+  const workspace = await db.collection("workspaces").findOne({
+    owner: userId,                  
+    type: workspaceType ?? "personal"
+  });
+  if (!workspace) return res.status(404).json({ error: "workspace not found" });
 
   const col = db.collection("tasks");
-
   const exists = await col.findOne({ taskId: id });
   if (exists) return res.json({ status: 'ok' });
 
   const newTask = {
     taskId: id,
-    workspaceId,
+    workspaceId: workspace.workspaceId,
     text,
     image: image || null,
     completed: false,
     archived: false,
     deleted: false,
-    createdBy: userEmail,
+    createdBy: userId,              
     createdAt: Date.now(),
     updatedAt: Date.now(),
     version: 1
@@ -86,16 +87,13 @@ app.post('/tasks', requireAuth, asyncHandler(async (req, res) => {
 
 // READ ALL
 app.get('/tasks', requireAuth, asyncHandler(async (req, res) => {
-  const { userEmail, workspaceType } = req.query;
-
-  if (!userEmail)
-    return res.status(400).json({ error: "userEmail required" });
+  const { workspaceType } = req.query;
+  const { userId } = req.user; // ← req.user se lo
 
   const ws = await db.collection("workspaces").findOne({
-    owner: userEmail,
-    type: workspaceType
+    owner: userId,                   // ← userId
+    type: workspaceType ?? "personal"
   });
-
   if (!ws) return res.json([]);
 
   const tasks = await db.collection("tasks")
@@ -180,30 +178,31 @@ app.delete('/tasks/:id', requireAuth, asyncHandler(async (req, res) => {
 // POST /archive/bulk — encrypt karke multiple tasks archive karo
 app.post('/archive/bulk', requireAuth, asyncHandler(async (req, res) => {
   const { tasks } = req.body;
+  const { userId } = req.user; // ← req.user se lo
 
   if (!Array.isArray(tasks) || tasks.length === 0)
     return res.status(400).json({ error: 'tasks array required' });
 
-  const col = db.collection("archive");
+  // workspace bhi dhundho
+  const workspace = await db.collection("workspaces").findOne({
+    owner: userId,
+    type: tasks[0]?.workspaceType ?? "personal"
+  });
 
+  const col = db.collection("archive");
   const docs = tasks.map(t => ({
-    _id: t.id,          // task id hi _id hai, duplicates skip honge
-    userEmail: t.userEmail,
-    workspaceType: t.workspaceType,
+    _id: t.id,
+    userId,                          // ← userId
+    workspaceId: workspace?.workspaceId, // ← actual workspaceId
     encryptedPayload: t.encryptedPayload,
     archivedAt: t.archivedAt,
     restoredAt: null,
   }));
 
-  // ordered:false → ek duplicate se poora bulk fail na ho
   await col.insertMany(docs, { ordered: false }).catch(err => {
-    // 11000 = duplicate key — safe to ignore
-    if (err.code !== 11000 && err.writeErrors?.some(e => e.code !== 11000)) {
-      throw err;
-    }
+    if (err.code !== 11000 && err.writeErrors?.some(e => e.code !== 11000)) throw err;
   });
 
-  // tasks collection mein bhi archived:true mark karo
   const taskIds = tasks.map(t => t.id);
   await db.collection("tasks").updateMany(
     { taskId: { $in: taskIds } },
@@ -214,24 +213,20 @@ app.post('/archive/bulk', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 
+
 // PATCH /archive/restore-all — pehle aana chahiye warna :id match kar leta hai
 app.patch('/archive/restore-all', requireAuth, asyncHandler(async (req, res) => {
-  const { userEmail } = req.body;
+  const { userId } = req.user; // ← req.user se lo
 
-  if (!userEmail)
-    return res.status(400).json({ error: 'userEmail required' });
-
-  // archive collection mein saare restoredAt set karo
   const archived = await db.collection("archive")
-    .find({ userEmail, restoredAt: null })
+    .find({ userId, restoredAt: null })    // ← userId
     .toArray();
 
   await db.collection("archive").updateMany(
-    { userEmail, restoredAt: null },
+    { userId, restoredAt: null },
     { $set: { restoredAt: Date.now() } }
   );
 
-  // tasks collection mein saare archived:false karo
   const taskIds = archived.map(a => a._id);
   if (taskIds.length > 0) {
     await db.collection("tasks").updateMany(
@@ -264,15 +259,12 @@ app.patch('/archive/:id/restore', requireAuth, asyncHandler(async (req, res) => 
 }));
 
 
-// GET /archive?userEmail=x — active (non-restored) archives fetch karo
+// GET /archive?
 app.get('/archive', requireAuth, asyncHandler(async (req, res) => {
-  const { userEmail } = req.query;
-
-  if (!userEmail)
-    return res.status(400).json({ error: 'userEmail required' });
+  const { userId } = req.user; // ← req.user se lo
 
   const tasks = await db.collection("archive")
-    .find({ userEmail, restoredAt: null })
+    .find({ userId, restoredAt: null })    // ← userId
     .toArray();
 
   res.json({ tasks });

@@ -95,7 +95,7 @@ export default function Signup() {
       });
 
       // zustand auth set
-      setAuth(data.token, data.user.name, data.user.email);
+      setAuth(data.token, data.user.name, data.user.email,data.user.userId);
 
       // save user to indexeddb
       await saveUser({

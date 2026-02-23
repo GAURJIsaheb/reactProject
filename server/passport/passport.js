@@ -9,6 +9,7 @@ dotenv.config();
 
 const SECRET = process.env.SECRET;
 
+
 // ─── Local Strategy (login ke liye) ───────────────────────────────────────────
 passport.use(
   "local",
@@ -22,7 +23,8 @@ passport.use(
         const ok = await bcrypt.compare(password, user.password);
         if (!ok) return done(null, false, { message: "Wrong password" });
 
-        return done(null, { email: user.email, name: user.name });
+        // ← userId add karo
+        return done(null, { email: user.email, name: user.name, userId: user._id.toString() });
       } catch (err) {
         return done(err);
       }
@@ -30,7 +32,7 @@ passport.use(
   )
 );
 
-// ─── JWT Strategy (protected routes ke liye) ──────────────────────────────────
+// JWT Strategy 
 passport.use(
   "jwt",
   new JwtStrategy(
@@ -40,8 +42,8 @@ passport.use(
     },
     async (payload, done) => {
       try {
-        // payload mein email aur name already hai (jwt.js se)
-        return done(null, { email: payload.email, name: payload.name });
+        // ← userId bhi pass karo
+        return done(null, { email: payload.email, name: payload.name, userId: payload.userId });
       } catch (err) {
         return done(err);
       }

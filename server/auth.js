@@ -1,6 +1,6 @@
 import express from "express";
 import bcrypt from "bcrypt";
-import passport from "./passport/passport.js"; // ← change
+import passport from "./passport/passport.js";
 import { signToken } from "./jwt.js";
 import { db } from "./mongo/mongo.js";
 
@@ -17,21 +17,34 @@ router.post("/signup", async (req, res) => {
   if (existing) return res.status(400).json({ error: "User already exists" });
 
   const hashed = await bcrypt.hash(password, 10);
-  await usersCol.insertOne({ email, name, password: hashed, createdAt: Date.now() });
+  
+  // ← pehle insert, phir _id lo
+  const result = await usersCol.insertOne({ 
+    email, name, password: hashed, createdAt: Date.now() 
+  });
+  const userId = result.insertedId.toString(); // ← real userId
 
   const wsCol = db.collection("workspaces");
-  await wsCol.insertOne({ workspaceId: crypto.randomUUID(), type: "personal",      owner: email, members: [email], createdAt: Date.now() });
-  await wsCol.insertOne({ workspaceId: crypto.randomUUID(), type: "professional",  owner: email, members: [email], createdAt: Date.now() });
-
-  const token = signToken({
-    email:user.email,
-    name:user.name,
-    userId:user._id.toString()
+  await wsCol.insertOne({ 
+    workspaceId: crypto.randomUUID(), 
+    type: "personal",      
+    owner: userId,       // ← email nahi
+    members: [userId],   // ← email nahi
+    createdAt: Date.now() 
   });
-  res.json({ token, user: { email, name } });
+  await wsCol.insertOne({ 
+    workspaceId: crypto.randomUUID(), 
+    type: "professional",  
+    owner: userId,       // ← email nahi
+    members: [userId],   // ← email nahi
+    createdAt: Date.now() 
+  });
+
+  const token = signToken({ email, name, userId }); // ← userId bhi
+  res.json({ token, user: { email, name, userId } });
 });
 
-/* ── LOGIN — ab passport local strategy handle karega ── */
+/* ── LOGIN ── */
 router.post(
   "/login",
   (req, res, next) => {
@@ -40,8 +53,8 @@ router.post(
       if (!user)
         return res.status(401).json({ error: info?.message || "Login failed" });
 
-      const token = signToken(user);
-      return res.json({ token, user });
+      const token = signToken(user); // user mein ab userId bhi hai
+      return res.json({ token, user }); // ← userId automatically aayega
     })(req, res, next);
   }
 );

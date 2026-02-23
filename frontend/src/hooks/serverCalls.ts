@@ -12,9 +12,9 @@ export async function fetchFromServer(
 
   try {
     const res = await fetch(
-      `${API_BASE}/tasks?userEmail=${userEmail}&workspaceType=${workspace}`,
+      `${API_BASE}/tasks?&workspaceType=${workspace}`,
       {
-        headers: authHeaders(token)
+        headers: authHeaders(token)//token mein userId already hai
       }
     );
 
@@ -50,7 +50,12 @@ export async function apiCreateTask(task: any, token: string) {
   await fetch(`${API_BASE}/tasks`, {
     method: "POST",
     headers: authHeaders(token),
-    body: JSON.stringify(task)
+    body: JSON.stringify({
+      id: task.id,
+      text: task.text,
+      image: task.image,
+      workspaceType: task.workspaceType,
+    })
   });
 }
 

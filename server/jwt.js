@@ -3,11 +3,11 @@ import dotenv from "dotenv"
 dotenv.config();
 
 const SECRET = process.env.SECRET;
-//console.log(secretKey);
+
 
 export function signToken(user){
   return jwt.sign(
-    { email:user.email, name:user.name },
+    { email: user.email, name: user.name, userId: user.userId }, // ← userId add
     SECRET,
     { expiresIn:"1d" }
   );

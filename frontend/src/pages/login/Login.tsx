@@ -33,7 +33,7 @@ export default function Login() {
     try {
       setLoading(true);
       const data = await loginUser({ email: trimmedEmail, password });
-      setAuth(data.token, data.user.name, data.user.email);
+      setAuth(data.token, data.user.name, data.user.email,data.user.userId);
       window.location.reload();
     } catch (err: any) {
       setError(err.message || "Login failed. Please try again.");
