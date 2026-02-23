@@ -4,11 +4,12 @@ import  type{QueueJob } from "@/types/queue";
 
 
 const DB_NAME = "MyTodoApp";
-const DB_VERSION = 4;
+const DB_VERSION = 5; // bumped: added archives store
 
 const STORE_TASKS = "tasks";
 const STORE_USER = "user";
 const STORE_SYNC = "syncQueue";
+const STORE_ARCHIVE = "archives";
 
 export async function initDB() {
   return openDB(DB_NAME, DB_VERSION, {
@@ -25,6 +26,11 @@ export async function initDB() {
       if (!db.objectStoreNames.contains(STORE_SYNC)) {
         const store = db.createObjectStore(STORE_SYNC, { keyPath: "id" });
         store.createIndex("byRetry", "retry");
+      }
+
+      // Archive store — encrypted task blobs live here
+      if (!db.objectStoreNames.contains(STORE_ARCHIVE)) {
+        db.createObjectStore(STORE_ARCHIVE, { keyPath: "id" });
       }
     }
   });
@@ -79,7 +85,31 @@ export const getAllTasks = async (
 };
 
 
+export async function getAllArchivedTasks(userEmail: string) {
+  if (!userEmail) return [];
+  const db = await initDB();
+  const all = await db.getAll(STORE_ARCHIVE);
+  return all.filter((a) => a.userEmail === userEmail);
+}
 
+export async function saveArchivedToDB(record: object) {
+  const db = await initDB();
+  await db.put(STORE_ARCHIVE, record);
+}
+
+export async function deleteArchivedFromDB(id: string) {
+  if (!id) return;
+  const db = await initDB();
+  await db.delete(STORE_ARCHIVE, id);
+}
+
+export async function clearAllArchivedFromDB(userEmail: string) {
+  const all = await getAllArchivedTasks(userEmail);
+  const db = await initDB();
+  for (const record of all) {
+    await db.delete(STORE_ARCHIVE, record.id);
+  }
+}
 
 
 
@@ -152,6 +182,7 @@ export async function clearAllUserData() {
   await db.clear("tasks");
   await db.clear("syncQueue");
   await db.clear("user");
+  // Note: archives intentionally NOT cleared on logout — user keeps their vault
 }
 
 //to reduce server call--->if checkbox multiple times toggle ho on offline,,so sbh call server pr na jaayein
@@ -200,4 +231,3 @@ export async function removeTaskUpdatesFromQueue(taskId: string): Promise<void> 
    }
  }
 }
-

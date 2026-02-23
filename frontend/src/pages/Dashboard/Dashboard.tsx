@@ -23,6 +23,7 @@ import EditTaskDialog from "@/components/tasks/EditTaskDialog";
 import SearchBar from "./SearchBar";
 import SortToggle from "./SortToggle";
 import type {SortType } from "./SortToggle";
+import Archive from "@/archive/archive";
 
 export default function Dashboard() {
   const [page, setPage] = useState(1);
@@ -178,6 +179,11 @@ const completedTasks = sorted.filter((t) => t.completed);
             active={activeTasks.length}
             done={completedTasks.length}
             total={tasks.length}
+          />
+
+          <Archive
+            tasks={tasks}             // pass all tasks
+            onTasksChanged={reloadTasks}  // reloadTasks from useTasksEngine
           />
 
           {/* SEARCH + SORT BAR */}
