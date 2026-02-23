@@ -185,22 +185,7 @@ export async function clearAllUserData() {
   // Note: archives intentionally NOT cleared on logout — user keeps their vault
 }
 
-//to reduce server call--->if checkbox multiple times toggle ho on offline,,so sbh call server pr na jaayein
-/*
-agar user:
 
-edit text
-then complete toggle
-then archive
-
-
-payload change hota.
-
-Old job replace ho raha but payload merge nahi.
-
-Better:
-always keep latest payload only.
- */
 export async function upsertQueue(job: QueueJob): Promise<void> {
  const db = await initDB();
  const all = await db.getAll("syncQueue");

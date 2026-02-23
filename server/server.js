@@ -11,6 +11,43 @@ const { app, server,clientPath } = createServer();
 
 // ─── Tasks CRUD ───────────────────────────────────────────────────────────────
 
+// BULK CREATE
+app.post('/tasks/bulk-create', requireAuth, asyncHandler(async (req, res) => {
+  const { tasks } = req.body;
+  if (!tasks?.length) return res.json({ ok: true });
+
+  const col = db.collection("tasks");
+
+  const docs = tasks.map(t => {
+    const workspaceId = t.workspaceType === "professional"
+      ? "pro_" + t.userEmail
+      : "personal_" + t.userEmail;
+
+    return {
+      taskId:        t.id,
+      workspaceId,
+      text:          t.text,
+      image:         t.image || null,
+      completed:     t.completed  ?? false,
+      archived:      t.archived   ?? false,
+      deleted:       t.deleted    ?? false,
+      createdBy:     t.userEmail,
+      workspaceType: t.workspaceType,
+      createdAt:     t.createdAt  ?? Date.now(),
+      updatedAt:     t.updatedAt  ?? Date.now(),
+      version: 1
+    };
+  });
+
+  // ordered:false → duplicate taskId ho to skip karo, baaki insert karo
+  await col.insertMany(docs, { ordered: false }).catch(err => {
+    if (err.code !== 11000 && err.writeErrors?.some(e => e.code !== 11000)) throw err;
+  });
+
+  res.json({ ok: true, inserted: docs.length });
+}));
+
+
 // CREATE
 app.post('/tasks', requireAuth, asyncHandler(async (req, res) => {
   const { id, text, image, userEmail, workspaceType } = req.body;
@@ -69,6 +106,24 @@ app.get('/tasks', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 
+
+// BULK UPDATE
+app.put('/tasks/bulk-update', requireAuth, asyncHandler(async (req, res) => {
+  const { updates } = req.body;   // [{ taskId, payload }]
+  if (!updates?.length) return res.json({ ok: true });
+
+  const bulkOps = updates.map(({ taskId, payload }) => ({
+    updateOne: {
+      filter: { taskId },
+      update: { $set: { ...payload, updatedAt: Date.now() } }
+    }
+  }));
+
+  const result = await db.collection("tasks").bulkWrite(bulkOps, { ordered: false });
+  res.json({ ok: true, modified: result.modifiedCount });
+}));
+
+
 // UPDATE
 app.put('/tasks/:id', requireAuth, asyncHandler(async (req, res) => {
   const taskId = req.params.id;
@@ -92,6 +147,20 @@ app.put('/tasks/:id', requireAuth, asyncHandler(async (req, res) => {
   res.json({ status: 'ok' });
 }));
 
+
+
+// BULK DELETE (soft)
+app.delete('/tasks/bulk-delete', requireAuth, asyncHandler(async (req, res) => {
+  const { taskIds } = req.body;
+  if (!taskIds?.length) return res.json({ ok: true });
+
+  const result = await db.collection("tasks").updateMany(
+    { taskId: { $in: taskIds } },
+    { $set: { deleted: true, updatedAt: Date.now() } }
+  );
+
+  res.json({ ok: true, deleted: result.modifiedCount });
+}));
 
 // DELETE (soft)
 app.delete('/tasks/:id', requireAuth, asyncHandler(async (req, res) => {

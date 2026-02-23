@@ -39,7 +39,7 @@ export default function Dashboard() {
   const [sort, setSort] = useState<SortType>("new");
 
   const { logout, userEmail ,token} = useAuthStore();
-  const { tasks, workspace,setWorkspace, createTask, toggleComplete, deleteTask, reloadTasks ,shareTask  } = useTasksEngine();
+  const { tasks, workspace,setWorkspace, createTask, toggleComplete, deleteTask, reloadTasks  } = useTasksEngine();
   const { theme, toggleTheme } = useTheme();
   const [input, setInput] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -63,8 +63,8 @@ export default function Dashboard() {
       return 0;
     });
 
-const activeTasks = sorted.filter((t) => !t.completed);
-const completedTasks = sorted.filter((t) => t.completed);
+  const activeTasks = sorted.filter((t) => !t.completed);
+  const completedTasks = sorted.filter((t) => t.completed);
   const totalPages = Math.ceil(activeTasks.length / PAGE_SIZE);
   const paginatedActive = activeTasks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const handleAdd = async () => {
@@ -127,9 +127,10 @@ const completedTasks = sorted.filter((t) => t.completed);
     useEffect(() => {
       if (!token) return;
 
-      const interval = setInterval(() => {
-        processQueue(token);
-      }, 10000); // try to scync at every 10 seconds
+       const interval = setInterval(async () => {
+          await processQueue(token);
+          await reloadTasks(); // ← UI refresh 
+        }, 10000); // try to scync at every 10 seconds
 
       return () => clearInterval(interval);
     }, [token]);
@@ -249,11 +250,6 @@ const completedTasks = sorted.filter((t) => t.completed);
                 onToggle={toggleComplete}
                 onEdit={(task) => setEditTask(task)}
                 onView={(task) => setViewTask(task)}
-                onShare={(task) => {
-                  const email = prompt("Send task to email?");
-                  if (!email) return;
-                  shareTask(task.id, email);
-                }}
                 draggable
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
@@ -285,7 +281,6 @@ const completedTasks = sorted.filter((t) => t.completed);
                     onToggle={toggleComplete}
                     onEdit={(task) => setEditTask(task)}
                     onView={(task) => setViewTask(task)}
-                    onShare={() => {}}
                     draggable
                     onDragStart={handleDragStart}
                     onDragOver={handleDragOver}

@@ -71,17 +71,3 @@ export async function apiDeleteTask(id: string, token: string) {
   });
 }
 
-export async function apiShare(task: any, toEmail: string, token: string) {
-  const res = await fetch(`${API_BASE}/share`, {
-    method: "POST",
-    headers: authHeaders(token),
-    body: JSON.stringify({
-      toEmail,
-      taskId: task.id,
-      createdBy: task.userEmail,
-      workspaceType: task.workspaceType
-    })
-  });
-
-  if (!res.ok) throw new Error("share failed");
-}

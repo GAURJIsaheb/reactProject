@@ -1,4 +1,4 @@
-import { Pencil, Trash2, Send, GripVertical } from "lucide-react";
+import { Pencil, Trash2, GripVertical } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -74,7 +74,6 @@ interface Props {
   onToggle: (id: string) => void;
   onEdit: (task: Task) => void;
   onView: (task: Task) => void;
-  onShare: (task: Task) => void;
   // Drag-and-drop props
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent, id: string) => void;
@@ -90,7 +89,6 @@ export default function TaskCard({
   onToggle,
   onEdit,
   onView,
-  onShare,
   draggable = false,
   onDragStart,
   onDragOver,
@@ -195,13 +193,6 @@ export default function TaskCard({
               >
                 <Pencil size={13} className="text-yellow-500" />
                 Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="flex items-center gap-2 cursor-pointer text-[13px] font-semibold rounded-lg"
-                onClick={() => onShare(task)}
-              >
-                <Send size={13} className="text-sky-500" />
-                Share
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem

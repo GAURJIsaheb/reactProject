@@ -20,7 +20,6 @@ This project follows an **offline-first distributed frontend architecture**.
 
 * JWT authentication
 * Task CRUD APIs
-* Share task API
 * Sync handling endpoints
 
 **Database Layers**
@@ -74,7 +73,7 @@ This project follows an **offline-first distributed frontend architecture**.
 * Delete task
 * Archive tasks
 * Workspace support (personal/professional)
-* Share task via email
+
 
 ### Sync Engine
 

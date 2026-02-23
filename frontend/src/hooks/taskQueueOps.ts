@@ -6,9 +6,14 @@ import {
   removeFromQueue
 } from "@/lib/idb";
 
-export async function queueCreate(task: any, userEmail: string, workspace: string) {
+export async function queueCreate(
+  task: any,
+  userEmail: string,
+  workspace: string,
+  jobId?: string  
+) {
   await addToQueue({
-    id: crypto.randomUUID(),
+    id: jobId ?? crypto.randomUUID(), // ← bahar se aaye to use karo
     action: "create",
     taskId: task.id,
     userEmail,
