@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { initDB } from "@/lib/idb";
 import { useAuthStore } from "@/zustand/authStore";
 import type { Task } from "@/types/task";
+import { processQueue } from "@/queue/syncQueue";
 
 import {
   loadLocalTasks,
@@ -21,9 +22,9 @@ import {
   apiCreateTask,
   apiUpdateTask,
   apiDeleteTask,
-  apiShare,
   fetchFromServer
 } from "./serverCalls"
+
 
 export function useTasksEngine() {
   const { userEmail, token } = useAuthStore();
@@ -48,6 +49,20 @@ export function useTasksEngine() {
   }, [loadTasks]);
 
 
+  // Net wapas aane pe sync trigger karo
+    useEffect(() => {
+      const handleOnline = async () => {
+        if (token) {
+          await processQueue(token);
+          await reloadTasks(); // ← ADD
+        }
+      };
+
+      window.addEventListener("online", handleOnline);
+      return () => window.removeEventListener("online", handleOnline);
+    }, [token]);
+
+
   //from server
   useEffect(() => {
   if (!token || !userEmail) return;
@@ -70,36 +85,38 @@ export function useTasksEngine() {
   /* ---------------- CREATE ---------------- */
 
   async function createTask(text: string, image?: string | null) {
-    if (!userEmail) throw new Error("User not authenticated");
+  if (!userEmail) throw new Error("User not authenticated");
 
-    const task: Task = {
-      id: crypto.randomUUID(),
-      text,
-      completed: false,
-      archived: false,
-      deleted: false,
-      image: image || null,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      userEmail,
-      workspaceType: workspace,
-      syncStatus: "pending"
-    };
+  const task: Task = {
+    id: crypto.randomUUID(),
+    text,
+    completed: false,
+    archived: false,
+    deleted: false,
+    image: image || null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    userEmail,
+    workspaceType: workspace,
+    syncStatus: "pending"
+  };
 
-    await saveLocalTask(task);
-    await queueCreate(task, userEmail, workspace);
+  await saveLocalTask(task);
+  const jobId = crypto.randomUUID(); // ← id store karo
+  await queueCreate(task, userEmail, workspace, jobId); // ← jobId pass karo
 
-    setTasks(prev => [...prev, task]);
+  setTasks(prev => [...prev, task]);
 
-    if (!token) return;
+  if (!token) return;
 
-    try {
-      await apiCreateTask(task, token);
-    } catch {
-      console.log("offline create queued");
-    }
+  try {
+    await apiCreateTask(task, token);
+    await removeQueueJob(jobId); // ← success → queue se hata do ✅
+    await saveLocalTask({ ...task, syncStatus: "synced" });
+  } catch {
+    console.log("offline create queued");
   }
-
+}
   /* ---------------- TOGGLE ---------------- */
 
   async function toggleComplete(id: string) {
@@ -194,20 +211,6 @@ export function useTasksEngine() {
     }
   }
 
-  /* ---------------- SHARE ---------------- */
-
-  async function shareTask(taskId: string, toEmail: string) {
-    if (!token) return;
-
-    const task = await getLocalTask(taskId);
-    if (!task) return;
-
-    try {
-      await apiShare(task, toEmail, token);
-    } catch {
-      console.log("share failed");
-    }
-  }
 
   return {
     tasks,
@@ -218,7 +221,6 @@ export function useTasksEngine() {
     deleteTask,
     editTask,
     loadTasks,
-    reloadTasks,
-    shareTask
+    reloadTasks
   };
 }
