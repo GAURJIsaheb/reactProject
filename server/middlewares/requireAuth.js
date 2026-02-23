@@ -1,19 +1,12 @@
-import { verifyToken } from "../jwt.js";
+import passport from "../passport/passport.js"; // ← change
 
-export function requireAuth(req,res,next){
- const header = req.headers.authorization;
+export function requireAuth(req, res, next) {
+  passport.authenticate("jwt", { session: false }, (err, user) => {
+    if (err) return next(err);
+    if (!user) return res.status(401).json({ error: "Invalid or missing token" });
 
- if(!header){
-  return res.status(401).json({error:"no token"});
- }
-
- const token = header.split(" ")[1];
-
- try{
-  const user = verifyToken(token);
-  req.user = user;
-  next();
- }catch{
-  res.status(401).json({error:"invalid token"});
- }
+    req.user = user; // { email, name }
+    next();
+  })(req, res, next);
 }
+
