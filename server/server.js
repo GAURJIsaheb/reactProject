@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+
 import path from 'path';
 
 import { createServer } from './setup.js';
@@ -6,51 +6,7 @@ import { asyncHandler } from './TryCatch/async.js';
 import { requireAuth } from './middlewares/requireAuth.js';
 import { connectDB, db } from './mongo/mongo.js';
 
-const { app, server, io, clientPath } = createServer();
-
-const users = new Map(); // userEmail → socket.id
-
-
-// ─── Socket ───────────────────────────────────────────────────────────────────
-
-io.on('connection', (socket) => {
-  socket.on('register', async (userEmail) => {
-    socket.userEmail = userEmail;
-    users.set(userEmail, socket.id);
-
-    const col = db.collection("tasks");
-
-    const unread = await col.find({
-      userEmail,
-      receivedAt: { $ne: null },
-      notified: { $ne: true },
-      deleted: false
-    }).toArray();
-
-    if (unread.length > 0) {
-      socket.emit('missedTasks', unread.length);
-      await col.updateMany(
-        { userEmail, receivedAt: { $ne: null }, notified: { $ne: true } },
-        { $set: { notified: true } }
-      );
-    }
-
-    console.log("Socket registered:", userEmail);
-  });
-
-  const heartbeatInterval = setInterval(() => {
-    const sentAt = Date.now();
-    socket.emit('heartbeat', sentAt, (clientTime) => {
-      console.log('Client alive | latency:', Date.now() - clientTime, 'ms');
-    });
-  }, 4000);
-
-  socket.on('disconnect', () => {
-    clearInterval(heartbeatInterval);
-    if (socket.userEmail) users.delete(socket.userEmail);
-    console.log('User disconnected');
-  });
-});
+const { app, server,clientPath } = createServer();
 
 
 // ─── Tasks CRUD ───────────────────────────────────────────────────────────────
