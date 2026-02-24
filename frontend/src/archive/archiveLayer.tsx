@@ -1,4 +1,4 @@
-// archiveLayer.ts
+
 // IndexDB operations for archived tasks
 // Archived tasks live in a separate "archives" object store
 

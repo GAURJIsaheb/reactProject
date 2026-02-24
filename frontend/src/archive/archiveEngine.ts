@@ -71,7 +71,7 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
           image: task.image,
         });
 
-        // Server ke liye: image hata do — payload chhota rahega (18MB → ~1KB)
+        //remove image for server — payload chhota rahega (18MB → ~1KB)
         const serverPayload = await encryptTask({
           id: task.id,
           text: task.text,

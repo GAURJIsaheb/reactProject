@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import passport from "./passport/passport.js";
 import { signToken } from "./jwt.js";
 import { db } from "./mongo/mongo.js";
+import { ObjectId } from "mongodb"; 
 
 const router = express.Router();
 
@@ -67,5 +68,24 @@ router.get(
     res.json({ user: req.user });
   }
 );
+
+router.get(
+  "/role",
+  passport.authenticate("jwt", { session: false }),
+  async (req, res) => {
+    try {
+      const { userId } = req.user;
+      const user = await db.collection("users").findOne(
+        { _id: new ObjectId(userId) },
+        { projection: { role: 1 } }
+      );
+      res.json({ role: user?.role ?? "user" });
+    } catch (err) {
+      console.error("Role fetch error:", err);
+      res.status(500).json({ error: "Could not fetch role" });
+    }
+  }
+);
+
 
 export default router;

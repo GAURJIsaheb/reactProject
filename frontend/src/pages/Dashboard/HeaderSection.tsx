@@ -3,7 +3,7 @@ import { Anchor, Moon, Sun, LogOut } from "lucide-react";
 type Props = {
   workspace: string;
   setWorkspace: (v: string) => void;
-  userEmail?: string | null;
+  userName?: string | null;
   theme: string;
   toggleTheme: () => void;
   logout: () => void;
@@ -12,7 +12,7 @@ type Props = {
 export default function HeaderSection({
   workspace,
   setWorkspace,
-  userEmail,
+  userName,
   theme,
   toggleTheme,
   logout,
@@ -50,10 +50,10 @@ export default function HeaderSection({
       </div>
 
       <div className="flex items-center gap-2">
-        {userEmail && (
-          <div className="px-3 py-1.5 rounded-full text-[11px] max-w-40 truncate
+        {userName && (
+          <div className="px-3 py-1.5 rounded-full text-[16px] max-w-40 truncate
           bg-background border border-border text-foreground font-mono">
-            {userEmail}
+            {userName}
           </div>
         )}
 

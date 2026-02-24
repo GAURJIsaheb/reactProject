@@ -213,7 +213,7 @@ export default function TaskCard({
         <img
           src={task.image}
           alt="attachment"
-          className="w-[75%] aspect-video object-cover rounded-xl"
+          className="w-[45%] aspect-video object-cover rounded-xl"
         />
 </div>
       )}

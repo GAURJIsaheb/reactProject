@@ -24,10 +24,11 @@ import SearchBar from "./SearchBar";
 import SortToggle from "./SortToggle";
 import type {SortType } from "./SortToggle";
 import Archive from "@/archive/archive";
+import { toast } from "sonner";
 
 export default function Dashboard() {
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 6;
+  const PAGE_SIZE = 15;
   const [loading, setLoading] = useState(true);
   const [viewTask, setViewTask] = useState<Task | null>(null);
   const [editTask, setEditTask] = useState<Task | null>(null);
@@ -38,7 +39,7 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortType>("new");
 
-  const { logout, userEmail ,token} = useAuthStore();
+  const { logout, userEmail , userName,token} = useAuthStore();
   const { tasks, workspace,setWorkspace, createTask, toggleComplete, deleteTask, reloadTasks  } = useTasksEngine();
   const { theme, toggleTheme } = useTheme();
   const [input, setInput] = useState("");
@@ -56,8 +57,9 @@ export default function Dashboard() {
   );
 
     //  SORT
-    const sorted = [...filtered].sort((a, b) => {
-      if (sort === "new") return b.createdAt - a.createdAt;
+    const sorted = sort === "new" 
+  ? filtered  // preserve drag order
+  : [...filtered].sort((a, b) => {
       if (sort === "old") return a.createdAt - b.createdAt;
       if (sort === "az") return a.text.localeCompare(b.text);
       return 0;
@@ -70,14 +72,29 @@ export default function Dashboard() {
   const handleAdd = async () => {
     if (!input.trim()) return;
     let base64: string | null = null;
+    const taskText = input.trim(); 
     if (imageFile) base64 = await fileToBase64(imageFile);
     setInput("");
     setImageFile(null);
     await createTask(input.trim(), base64);
    
     if (fileRef.current) fileRef.current.value = "";
+    toast.success("✨ Task added!", {
+    description: `"${taskText}"`,
+    duration: 2500,
+  });
   };
 
+  const handleDelete = (id: string) => {
+      const task = tasks.find((t) => t.id === id);
+
+      deleteTask(id);
+
+      toast.success("🧹 Task deleted", {
+        description: task ? `"${task.text}"` : "Task removed",
+        duration: 2500,
+      });
+    };
   const handleEditSave = async (id: string, text: string, image?: string | null) => {
     if (!userEmail) return;
     const updatedTask = {
@@ -122,7 +139,7 @@ export default function Dashboard() {
   };
 
   // Global index for palette assignment (stable across active + completed)
-  const globalIndex = (task: Task) => orderedTasks.indexOf(task);
+    const globalIndex = (task: Task) => taskOrder.indexOf(task.id);
 
     useEffect(() => {
       if (!token) return;
@@ -169,7 +186,7 @@ export default function Dashboard() {
           <HeaderSection
             workspace={workspace}
             setWorkspace={setWorkspace}
-            userEmail={userEmail}
+            userName={userName}
             theme={theme}
             toggleTheme={toggleTheme}
             logout={logout}
@@ -246,7 +263,7 @@ export default function Dashboard() {
                 key={t.id}
                 task={t}
                 index={globalIndex(t)}
-                onDelete={deleteTask}
+                onDelete={handleDelete}
                 onToggle={toggleComplete}
                 onEdit={(task) => setEditTask(task)}
                 onView={(task) => setViewTask(task)}
@@ -277,7 +294,7 @@ export default function Dashboard() {
                     key={t.id}
                     task={t}
                     index={globalIndex(t)}
-                    onDelete={deleteTask}
+                    onDelete={handleDelete}
                     onToggle={toggleComplete}
                     onEdit={(task) => setEditTask(task)}
                     onView={(task) => setViewTask(task)}

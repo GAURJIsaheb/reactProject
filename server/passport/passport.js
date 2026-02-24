@@ -23,7 +23,6 @@ passport.use(
         const ok = await bcrypt.compare(password, user.password);
         if (!ok) return done(null, false, { message: "Wrong password" });
 
-        // ← userId add karo
         return done(null, { email: user.email, name: user.name, userId: user._id.toString() });
       } catch (err) {
         return done(err);

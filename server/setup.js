@@ -8,6 +8,8 @@ import { fileURLToPath } from 'url';
 import authRoutes from './auth.js';
 import passport from "./passport/passport.js"; 
 
+import adminRoutes from './admin/admin.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const clientPath = path.join(__dirname, '..', 'client');
@@ -28,8 +30,11 @@ export function createServer() {
     credentials: true
   }));
 
+
+
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
   app.use(session({
     name: 'todo.sid',
     secret: 'super-secret-key',
@@ -39,9 +44,12 @@ export function createServer() {
   }));
 
   // ── Passport ──────────────────────────────
-  app.use(passport.initialize()); // ← ADD (session use nahi kar rahe JWT ke saath)
+  app.use(passport.initialize()); 
+
 
   app.use('/auth', authRoutes);
+  app.use('/admin', adminRoutes);
+  
   app.use('/pages', express.static(path.join(clientPath, 'pages')));
   app.use(express.static(clientPath));
 
