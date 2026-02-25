@@ -29,9 +29,9 @@ export default function TasksPerUserChart({ data }:Props) {
             width={80}
           />
           <Tooltip
-  contentStyle={{ background: "#0a0a0a", border: "1px solid #3f3f46", borderRadius: "8px", fontSize: "12px" }}
-  labelStyle={{ color: "#a1a1aa" }}
-  itemStyle={{ color: "#fff" }}
+          contentStyle={{ background: "#0a0a0a", border: "1px solid #3f3f46", borderRadius: "8px", fontSize: "12px" }}
+          labelStyle={{ color: "#a1a1aa" }}
+          itemStyle={{ color: "#fff" }}
 />
 
           <Bar dataKey="count" fill={NEON.purple} radius={[0,4,4,0]} />

@@ -35,7 +35,7 @@ export default function TopUsers({ topUsers }:Props) {
                 {u.name || "Unknown"}
               </div>
               <div className="text-xs text-zinc-500 font-mono">
-                {u.taskCount} tasks · {u.avgVersion?.toFixed(1)}x edits
+                {u.taskCount} tasks · {u.avgVersion?.toFixed(2)}x edits
               </div>
             </div>
 

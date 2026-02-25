@@ -17,151 +17,90 @@ export default function ViewTaskDialog({ open, onOpenChange, task }: Props) {
   if (!task) return null;
 
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="
+        sm:max-w-lg 
+        bg-[#0c0e1a] 
+        border border-indigo-500/20 
+        rounded-2xl 
+        overflow-hidden 
+        shadow-[0_0_0_1px_rgba(99,102,241,0.1),0_0_60px_rgba(99,102,241,0.12),0_40px_80px_rgba(0,0,0,0.6)]
+        font-[Syne]
+      "
+      >
+        {/* glow bar */}
+        <div className="h-0.5 bg-linear-to-r from-transparent via-indigo-500  to-transparent -mx-px -mt-px" />
 
-        .vtd-overlay [role="dialog"] {
-          background: #0c0e1a !important;
-          border: 1px solid rgba(99,102,241,0.2) !important;
-          border-radius: 24px !important;
-          box-shadow:
-            0 0 0 1px rgba(99,102,241,0.1),
-            0 0 60px rgba(99,102,241,0.12),
-            0 40px 80px rgba(0,0,0,0.6) !important;
-          overflow: hidden !important;
-          font-family: 'Syne', sans-serif !important;
-        }
+        <DialogHeader className="pt-1">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <DialogTitle
+              className="
+              text-[20px] font-extrabold tracking-[-0.3px]
+              bg-linear-to-br from-[#e8eaf0] to-indigo-300
+              bg-clip-text text-transparent
+            "
+            >
+              Task Details
+            </DialogTitle>
 
-        .vtd-glow-bar {
-          height: 2px;
-          background: linear-gradient(90deg, transparent, #6366f1, #ec4899, #06b6d4, transparent);
-          margin: -1px -1px 0;
-          position: relative;
-        }
-
-        .vtd-title {
-          font-size: 20px; font-weight: 800; letter-spacing: -0.3px;
-          background: linear-gradient(135deg, #e8eaf0, #a5b4fc);
-          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-
-        .vtd-badge {
-          display: inline-flex; align-items: center; gap: 6px;
-          padding: 4px 10px; border-radius: 20px;
-          font-size: 11px; font-weight: 600;
-        }
-        .vtd-badge.synced {
-          background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25);
-          color: #6ee7b7;
-        }
-        .vtd-badge.pending {
-          background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25);
-          color: #fde047;
-          animation: vtdPendingPulse 2s ease-in-out infinite;
-        }
-        @keyframes vtdPendingPulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
-
-        .vtd-field {
-          padding: 14px 16px;
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 14px;
-        }
-
-        .vtd-field-label {
-          display: flex; align-items: center; gap: 7px;
-          font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
-          text-transform: uppercase; color: #4b5563; margin-bottom: 8px;
-        }
-
-        .vtd-field-label svg { opacity: 0.7; }
-
-        .vtd-field-value {
-          font-size: 14px; font-weight: 600; color: #d1d5db;
-          line-height: 1.5;
-        }
-
-        .vtd-field-value.mono {
-          font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #9ca3af;
-        }
-
-        .vtd-task-text {
-          font-size: 16px; font-weight: 700; color: #e8eaf0; line-height: 1.5;
-        }
-
-        .vtd-img-wrap {
-          border-radius: 16px; overflow: hidden;
-          border: 1px solid rgba(255,255,255,0.1);
-          box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-          position: relative;
-        }
-
-        .vtd-img-wrap::before {
-          content: '';
-          position: absolute; inset: 0;
-          background: linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.4));
-          z-index: 1; pointer-events: none;
-        }
-
-        .vtd-img {
-          width: 100%; max-height: 260px;
-          object-fit: cover; display: block;
-        }
-      `}</style>
-
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-lg vtd-overlay">
-          <div className="vtd-glow-bar" />
-
-          <DialogHeader style={{ paddingTop: 4 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-              <DialogTitle className="vtd-title">Task Details</DialogTitle>
-              <span className={`vtd-badge ${task.syncStatus === "synced" ? "synced" : "pending"}`}>
-                {task.syncStatus === "synced"
-                  ? <><Wifi size={11} /> Synced</>
-                  : <><WifiOff size={11} /> Pending</>}
+            {/* status badge */}
+            {task.syncStatus === "synced" ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-emerald-400/30 bg-emerald-400/10 text-emerald-300">
+                <Wifi size={11} /> Synced
               </span>
-            </div>
-          </DialogHeader>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
-
-            {/* Task text */}
-            <div className="vtd-field">
-              <div className="vtd-field-label">Task</div>
-              <div className="vtd-task-text">{task.text}</div>
-            </div>
-
-            {/* User */}
-            <div className="vtd-field">
-              <div className="vtd-field-label">
-                <User size={12} /> Owner
-              </div>
-              <div className="vtd-field-value mono">{task.userEmail}</div>
-            </div>
-
-            {/* Created */}
-            <div className="vtd-field">
-              <div className="vtd-field-label">
-                <Clock size={12} /> Created
-              </div>
-              <div className="vtd-field-value mono">
-                {new Date(task.createdAt).toLocaleString()}
-              </div>
-            </div>
-
-            {/* Image */}
-            {task.image && (
-              <div className="vtd-img-wrap">
-                <img src={task.image} className="vtd-img" alt="task attachment" />
-              </div>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-amber-400/30 bg-amber-400/10 text-yellow-300 animate-pulse">
+                <WifiOff size={11} /> Pending
+              </span>
             )}
-
           </div>
-        </DialogContent>
-      </Dialog>
-    </>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-3 mt-1">
+          {/* Task text */}
+          <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+            <div className="text-[10px] font-bold tracking-[1.5px] uppercase text-gray-500 mb-2">
+              Task
+            </div>
+            <div className="text-[16px] font-bold text-[#e8eaf0] leading-relaxed">
+              {task.text}
+            </div>
+          </div>
+
+          {/* Owner */}
+          <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+            <div className="flex items-center gap-2 text-[10px] font-bold tracking-[1.5px] uppercase text-gray-500 mb-2">
+              <User size={12} className="opacity-70" /> Owner
+            </div>
+            <div className="text-[12px] font-medium text-gray-400 font-mono">
+              {task.userEmail}
+            </div>
+          </div>
+
+          {/* Created */}
+          <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+            <div className="flex items-center gap-2 text-[10px] font-bold tracking-[1.5px] uppercase text-gray-500 mb-2">
+              <Clock size={12} className="opacity-70" /> Created
+            </div>
+            <div className="text-[12px] font-medium text-gray-400 font-mono">
+              {new Date(task.createdAt).toLocaleString()}
+            </div>
+          </div>
+
+          {/* Image */}
+          {task.image && (
+            <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+              <img
+                src={task.image}
+                alt="task attachment"
+                className="w-full max-h-65 object-cover block"
+              />
+              <div className="absolute inset-0 bg-linear-to-b from-transparent via-transparent to-black/40 pointer-events-none" />
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

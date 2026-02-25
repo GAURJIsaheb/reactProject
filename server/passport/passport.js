@@ -1,4 +1,3 @@
-// server/passport.js
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Strategy as JwtStrategy, ExtractJwt } from "passport-jwt";
@@ -10,7 +9,7 @@ dotenv.config();
 const SECRET = process.env.SECRET;
 
 
-// ─── Local Strategy (login ke liye) ───────────────────────────────────────────
+// ─── Local Strategy (for login) ───────────────────────────────────────────
 passport.use(
   "local",
   new LocalStrategy(
@@ -23,6 +22,8 @@ passport.use(
         const ok = await bcrypt.compare(password, user.password);
         if (!ok) return done(null, false, { message: "Wrong password" });
 
+
+      //return done(error,  {userobject})--> if error is null and user is valid then it will return user details in req.user
         return done(null, { email: user.email, name: user.name, userId: user._id.toString() });
       } catch (err) {
         return done(err);
@@ -41,7 +42,6 @@ passport.use(
     },
     async (payload, done) => {
       try {
-        // ← userId bhi pass karo
         return done(null, { email: payload.email, name: payload.name, userId: payload.userId });
       } catch (err) {
         return done(err);

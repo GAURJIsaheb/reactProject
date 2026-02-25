@@ -24,7 +24,7 @@ function getStrength(pw: string): number {
 
 export default function Signup() {
   const [username, setUsername] = useState("");
-  const [email, setEmail] = useState(""); // ✅ added
+  const [email, setEmail] = useState(""); 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 

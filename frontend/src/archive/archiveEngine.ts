@@ -1,11 +1,11 @@
-// useArchiveEngine.ts
+
 // Core hook for archive/restore logic
 // Offline-first: IndexDB first, then sync to MongoDB
 
 import { useState, useCallback } from "react";
 import { useAuthStore } from "@/zustand/authStore";
 import type { Task } from "@/types/task";
-import { deleteLocalTask, saveLocalTask } from "@/hooks/indexdbLayer"; // adjust path if needed
+import { deleteLocalTask, saveLocalTask } from "@/hooks/indexdbLayer"; 
 
 import { encryptTask, decryptTask } from "./archiveService";
 import {
@@ -28,7 +28,7 @@ import {
   apiArchiveTasks,
   apiRestoreTask,
   apiRestoreAllTasks,
-} from "./archiveServerCalls";
+} from "../api/archiveApi";
 
 export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
   const { userEmail, token } = useAuthStore();
@@ -59,7 +59,7 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
       for (let i = 0; i < total; i++) {
         const task = tasks[i];
 
-        // IndexDB ke liye: image bhi encrypt karo (local restore mein kaam aayegi)
+        // image encrption of indexDb (for local restore )
         const idbPayload = await encryptTask({
           id: task.id,
           text: task.text,
@@ -71,7 +71,6 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
           image: task.image,
         });
 
-        //remove image for server — payload chhota rahega (18MB → ~1KB)
         const serverPayload = await encryptTask({
           id: task.id,
           text: task.text,
@@ -88,7 +87,7 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
           workspaceType: task.workspaceType,
           archived: true,
           encrypted: true,
-          encryptedPayload: idbPayload, // image wala — IndexDB mein
+          encryptedPayload: idbPayload, 
           archivedAt: Date.now(),
         };
 
@@ -103,7 +102,7 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
           id: task.id,
           userEmail,
           workspaceType: task.workspaceType,
-          encryptedPayload: serverPayload, // image nahi — server ke liye
+          encryptedPayload: serverPayload, 
           archivedAt: archiveRecord.archivedAt,
         });
 
@@ -115,7 +114,7 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
       // Refresh dashboard tasks
       await onTasksChanged();
 
-      // Sync to MongoDB (best effort)
+      // Sync to MongoDB 
       if (token) {
         try {
           await apiArchiveTasks(serverPayloads, token);
@@ -167,7 +166,7 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
         // Remove from archive IndexDB store
         await deleteArchivedFromDB(record.id);
 
-        // Soft delete on MongoDB (restoredAt set)
+        // Soft delete on MongoDB 
         if (token) {
           try {
             await apiRestoreTask(record.id, token);

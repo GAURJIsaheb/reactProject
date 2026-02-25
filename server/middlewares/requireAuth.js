@@ -1,4 +1,5 @@
-import passport from "../passport/passport.js"; // ← change
+//a middleware/wrapper used for protected routes,,,it is using passport.js in it
+import passport from "../passport/passport.js"; 
 
 export function requireAuth(req, res, next) {
   passport.authenticate("jwt", { session: false }, (err, user) => {
@@ -9,4 +10,9 @@ export function requireAuth(req, res, next) {
     next();
   })(req, res, next);
 }
+
+
+
+/*
+next = next middleware--> means let it move to next part/middleware/api calls */
 

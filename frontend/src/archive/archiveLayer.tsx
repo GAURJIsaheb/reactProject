@@ -1,6 +1,5 @@
 
 // IndexDB operations for archived tasks
-// Archived tasks live in a separate "archives" object store
 
 import type { EncryptedPayload } from "./archiveService";
 
@@ -20,7 +19,6 @@ const ARCHIVE_STORE = "archives";
 
 async function openArchiveDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    // Open with a slightly higher version to add archive store if missing
     const request = indexedDB.open(DB_NAME);
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);

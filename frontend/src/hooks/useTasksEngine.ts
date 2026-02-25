@@ -23,7 +23,7 @@ import {
   apiUpdateTask,
   apiDeleteTask,
   fetchFromServer
-} from "./serverCalls"
+} from "../api/taskApi"
 
 
 export function useTasksEngine() {
@@ -49,12 +49,12 @@ export function useTasksEngine() {
   }, [loadTasks]);
 
 
-  // Net wapas aane pe sync trigger karo
+  // sync trigger when net online
     useEffect(() => {
       const handleOnline = async () => {
         if (token) {
           await processQueue(token);
-          await reloadTasks(); // ← ADD
+          await reloadTasks(); 
         }
       };
 
@@ -102,8 +102,8 @@ export function useTasksEngine() {
   };
 
   await saveLocalTask(task);
-  const jobId = crypto.randomUUID(); // ← id store karo
-  await queueCreate(task, userEmail, workspace, jobId); // ← jobId pass karo
+  const jobId = crypto.randomUUID();
+  await queueCreate(task, userEmail, workspace, jobId); 
 
   setTasks(prev => [...prev, task]);
 
@@ -111,7 +111,7 @@ export function useTasksEngine() {
 
   try {
     await apiCreateTask(task, token);
-    await removeQueueJob(jobId); // ← success → queue se hata do ✅
+    await removeQueueJob(jobId); // ← success → remove from queue
     await saveLocalTask({ ...task, syncStatus: "synced" });
   } catch {
     console.log("offline create queued");

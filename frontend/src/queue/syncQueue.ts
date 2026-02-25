@@ -13,7 +13,7 @@ export async function processQueue(token: string) {
   const queue = await getQueue();
   if (queue.length === 0) return;
 
-  // ── Guard: agar pehle se chal raha hai to skip ──
+  // ── Guard: if queue is running already,then skip ──
   if ((processQueue as any)._running) return;
   (processQueue as any)._running = true;
 
@@ -51,7 +51,7 @@ export async function processQueue(token: string) {
       if (!res.ok) throw new Error("bulk-delete failed");
     }
 
-    // Sab succeed → queue clear karo
+    // Everything success,,clear the queue
     for (const item of queue) {
       const task = await getTaskById(item.taskId);
       if (task) await addTask({ ...task, syncStatus: "synced" });
@@ -59,8 +59,8 @@ export async function processQueue(token: string) {
     }
 
   } catch (err) {
-    console.log("Bulk sync failed:", err); // ← yahan dekho actual error
+    console.log("Bulk sync failed:", err); 
   } finally {
-    (processQueue as any)._running = false; // ← hamesha unlock karo
+    (processQueue as any)._running = false; 
   }
 }

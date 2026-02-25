@@ -17,7 +17,7 @@ async function requireSuperAdmin(req, res, next) {
 }
 
 // ─── GET /admin/analytics ─────────────────────────────────────────────────────
-// Master analytics endpoint — all aggregations in parallel
+// analytics endpoint — all aggregations in parallel
 router.get('/analytics', requireAuth, requireSuperAdmin, asyncHandler(async (req, res) => {
   const tasks = db.collection("tasks");
   const users = db.collection("users");
@@ -77,7 +77,7 @@ router.get('/analytics', requireAuth, requireSuperAdmin, asyncHandler(async (req
     tasks.aggregate([
       { $match: { deleted: false } },
       { $group: { _id: '$createdBy', taskCount: { $sum: 1 }, avgVersion: { $avg: '$version' }, lastActive: { $max: '$updatedAt' } } },
-      { $sort: { avgVersion: -1 } },
+      { $sort: { avgVersion: -1, taskCount: -1 } },  
       { $limit: 5 },
       {
         $lookup: {

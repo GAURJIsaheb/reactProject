@@ -47,7 +47,7 @@ type AnalyticsResponse = {
   recentActivity: ActivityItem[];
 };
 
-// ── fetcher function (outside component so it's stable) ──────────────────────
+// ── fetcher function
 const fetchAnalytics = async (): Promise<AnalyticsResponse> => {
   const token = localStorage.getItem("token");
   const res = await fetch(`${API}/admin/analytics`, {

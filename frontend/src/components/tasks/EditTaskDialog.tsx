@@ -191,23 +191,6 @@ export default function EditTaskDialog({ open, onOpenChange, task, onSave }: Pro
 
     {/* Actions */}
     <div className="flex gap-2.5 mt-1">
-      {/* <button
-        className="
-          flex-1
-          py-3.5
-          bg-white/5
-          border border-white/10
-          rounded-[14px]
-          text-gray-500 font-bold text-[14px]
-          flex items-center justify-center gap-2
-          transition
-          hover:bg-white/10
-          hover:text-gray-300
-        "
-        onClick={() => onOpenChange(false)}
-      >
-        Cancel
-      </button> */}
 
       <button
         className="

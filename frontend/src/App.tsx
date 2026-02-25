@@ -33,9 +33,8 @@ function App() {
       const data = await res.json();
       setAuth(token, data.user.name, data.user.email, data.user.userId);
 
-      // ── Step 2: Check admin role from /auth/me response directly ────────
-      // Instead of probing /admin/analytics (which needs body parsing etc.),
-      // we fetch the user's role from a dedicated lightweight endpoint
+      // ── Step 2: Check admin role from /auth/me response  ────────
+
       const roleRes = await fetch(`${API}/auth/role`, {
         headers: { Authorization: `Bearer ${token}` },
       });

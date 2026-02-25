@@ -22,6 +22,8 @@
     --color-border: var(--border);
     --color-input: var(--input);
     --color-ring: var(--ring);
+    --font-syne: "Syne", sans-serif;
+    --font-mono: "JetBrains Mono", monospace;
 
 }
 
@@ -99,6 +101,7 @@
     @apply border-border outline-ring/50;
     }
   body {
+    
     @apply bg-background text-foreground;
     }
 }

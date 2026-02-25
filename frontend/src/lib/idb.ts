@@ -4,7 +4,7 @@ import  type{QueueJob } from "@/types/queue";
 
 
 const DB_NAME = "MyTodoApp";
-const DB_VERSION = 5; // bumped: added archives store
+const DB_VERSION = 5; 
 
 const STORE_TASKS = "tasks";
 const STORE_USER = "user";
@@ -210,7 +210,7 @@ export async function upsertQueue(job: QueueJob): Promise<void> {
 
 
 
-//Delete aaye to:---->old updates remove.
+//if Delete :---->old updates remove.
 export async function removeTaskUpdatesFromQueue(taskId: string): Promise<void> {
  const db = await initDB();
  const all = await db.getAll("syncQueue");

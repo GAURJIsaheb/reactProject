@@ -29,19 +29,19 @@ router.post("/signup", async (req, res) => {
   await wsCol.insertOne({ 
     workspaceId: crypto.randomUUID(), 
     type: "personal",      
-    owner: userId,       // ← email nahi
-    members: [userId],   // ← email nahi
+    owner: userId,       
+    members: [userId],   
     createdAt: Date.now() 
   });
   await wsCol.insertOne({ 
     workspaceId: crypto.randomUUID(), 
     type: "professional",  
-    owner: userId,       // ← email nahi
-    members: [userId],   // ← email nahi
+    owner: userId,       
+    members: [userId],   
     createdAt: Date.now() 
   });
 
-  const token = signToken({ email, name, userId }); // ← userId bhi
+  const token = signToken({ email, name, userId }); 
   res.json({ token, user: { email, name, userId } });
 });
 
@@ -54,8 +54,8 @@ router.post(
       if (!user)
         return res.status(401).json({ error: info?.message || "Login failed" });
 
-      const token = signToken(user); // user mein ab userId bhi hai
-      return res.json({ token, user }); // ← userId automatically aayega
+      const token = signToken(user); 
+      return res.json({ token, user });
     })(req, res, next);
   }
 );

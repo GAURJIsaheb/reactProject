@@ -1,5 +1,4 @@
-// Archive.tsx
-// Full archive UI — multi-select, encrypt & archive, restore single/all
+// archive UI — multi-select, encrypt & archive, restore single/all
 // Offline-first, AES-GCM encrypted, IndexDB + MongoDB
 
 import { useEffect, useState} from "react";
