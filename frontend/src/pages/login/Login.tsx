@@ -36,7 +36,7 @@ export default function Login() {
 
       const data = await loginUser({ email: trimmedEmail, password });
 
-      // optional: detect user switch
+      // detect user switch
       if (data.user.email !== email) {
         await clearAllUserData(); 
       }

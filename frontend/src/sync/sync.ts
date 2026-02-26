@@ -40,7 +40,7 @@ export async function fetchWorkspaceId(
 }
 
 // ─── Pull sections + tasks in one go ─────────────────────────────────────────
-// Returns true if anything changed (caller should reloadTasks)
+// Returns true if anything changed 
 export async function pullFromServer(
   workspaceId: string,
   workspaceType: string,
