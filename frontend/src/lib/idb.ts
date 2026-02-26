@@ -1,89 +1,68 @@
 import { openDB } from "idb";
-import  type{ Task} from "@/types/task";
-import  type{QueueJob } from "@/types/queue";
-
+import type { Task } from "@/types/task";
+import type { QueueJob } from "@/types/queue";
+import type { Section } from "@/types/section";
 
 const DB_NAME = "MyTodoApp";
-const DB_VERSION = 5; 
+const DB_VERSION = 5;
 
 const STORE_TASKS = "tasks";
 const STORE_USER = "user";
 const STORE_SYNC = "syncQueue";
 const STORE_ARCHIVE = "archives";
+const STORE_SECTIONS = "sections";
 
 export async function initDB() {
   return openDB(DB_NAME, DB_VERSION, {
     upgrade(db) {
-
       if (!db.objectStoreNames.contains(STORE_TASKS)) {
         db.createObjectStore(STORE_TASKS, { keyPath: "id" });
       }
-
       if (!db.objectStoreNames.contains(STORE_USER)) {
-        db.createObjectStore(STORE_USER, { keyPath:"userId" });
+        db.createObjectStore(STORE_USER, { keyPath: "userId" });
       }
-
       if (!db.objectStoreNames.contains(STORE_SYNC)) {
         const store = db.createObjectStore(STORE_SYNC, { keyPath: "id" });
         store.createIndex("byRetry", "retry");
       }
-
-      // Archive store — encrypted task blobs live here
+      if (!db.objectStoreNames.contains(STORE_SECTIONS)) {
+        const s = db.createObjectStore(STORE_SECTIONS, { keyPath: "id" });
+        s.createIndex("byWorkspace", "workspaceType");
+      }
       if (!db.objectStoreNames.contains(STORE_ARCHIVE)) {
         db.createObjectStore(STORE_ARCHIVE, { keyPath: "id" });
       }
-    }
+    },
   });
 }
 
-
-export const addTask = async (task :Partial<Task>): Promise<void>  => {
+export const addTask = async (task: Partial<Task>): Promise<void> => {
   if (!task?.id) return;
-
   const db = await initDB();
   const existing = await db.get(STORE_TASKS, task.id);
-
   const mergedTask = {
     ...existing,
     ...task,
-
-    // workspace default safety
-    workspaceType:
-      task.workspaceType ??
-      existing?.workspaceType ??
-      "personal",
-
-    // preserve image
-    image:
-      task.image !== undefined
-        ? task.image
-        : existing?.image
+    workspaceType: task.workspaceType ?? existing?.workspaceType ?? "personal",
+    image: task.image !== undefined ? task.image : existing?.image,
   };
-
   await db.put(STORE_TASKS, mergedTask);
 };
 
-
-
-
-//userEmail and workspace
 export const getAllTasks = async (
   userEmail: string,
   workspaceType: string
 ): Promise<Task[]> => {
-
   if (!userEmail) return [];
-
   const db = await initDB();
   const allTasks = await db.getAll(STORE_TASKS);
-
-  return allTasks.filter(t =>
-    t.userEmail === userEmail &&
-    (t.workspaceType || "personal") === workspaceType &&
-    !t.deleted
+  return allTasks.filter(
+    (t) =>
+      t.userEmail === userEmail &&
+      (t.workspaceType || "personal") === workspaceType &&
+      !t.deleted
   );
 };
-
 
 export async function getAllArchivedTasks(userEmail: string) {
   if (!userEmail) return [];
@@ -111,8 +90,6 @@ export async function clearAllArchivedFromDB(userEmail: string) {
   }
 }
 
-
-
 export const saveUser = async (userData: {
   userId: string;
   email: string;
@@ -126,98 +103,142 @@ export const saveUser = async (userData: {
 export const getUser = async (
   email: string
 ): Promise<{ email: string; name: string } | null> => {
-  if (!email) return null; //Never call IDB with undefined key.
+  if (!email) return null;
   const db = await initDB();
   return db.get(STORE_USER, email);
 };
 
-
-//o(1)
 export async function getTaskById(id: string): Promise<Task | null> {
-
-  if (!id) return null;  
+  if (!id) return null;
   const db = await initDB();
-  return db.get('tasks', id);
+  return db.get("tasks", id);
 }
 
-
-export const deleteTaskFromIDB = async (
-  id: string
-): Promise<void> => {
-  if (!id) return;  
+export const deleteTaskFromIDB = async (id: string): Promise<void> => {
+  if (!id) return;
   const db = await initDB();
-  const tx = db.transaction(STORE_TASKS, 'readwrite');
+  const tx = db.transaction(STORE_TASKS, "readwrite");
   tx.store.delete(id);
   await tx.done;
-  console.log('IDB DELETE COMMITTED:', id);
 };
 
+// ─── NEW: Hard-delete ALL tasks belonging to a section from IDB ──────────────
+// Used when a section is deleted so IDB stays clean (no orphaned tasks).
+export async function deleteTasksBySectionFromIDB(sectionId: string): Promise<string[]> {
+  if (!sectionId) return [];
+  const db = await initDB();
+  const all = await db.getAll(STORE_TASKS);
+  const sectionTasks = all.filter((t) => t.sectionId === sectionId);
 
+  const tx = db.transaction(STORE_TASKS, "readwrite");
+  for (const task of sectionTasks) {
+    tx.store.delete(task.id);
+  }
+  await tx.done;
 
+  // Return deleted task IDs so caller can handle server-side soft-deletes
+  return sectionTasks.map((t) => t.id);
+}
 
-//queue helpet functions
+// Queue helpers
 export async function addToQueue(item: QueueJob): Promise<void> {
   const db = await initDB();
   await db.put("syncQueue", item);
 }
 
-
-export async function getQueue(){
- const db = await initDB();
- return db.getAll('syncQueue');
+export async function getQueue() {
+  const db = await initDB();
+  return db.getAll("syncQueue");
 }
 
-export async function removeFromQueue(
-  id: string
-): Promise<void> {
- const db = await initDB();
- return db.delete('syncQueue', id);
+export async function removeFromQueue(id: string): Promise<void> {
+  const db = await initDB();
+  return db.delete("syncQueue", id);
 }
 
-export async function updateQueue(
-  item: QueueJob
-): Promise<void> {
+export async function updateQueue(item: QueueJob): Promise<void> {
   const db = await initDB();
   await db.put(STORE_SYNC, item);
 }
-
 
 export async function clearAllUserData() {
   const db = await initDB();
   await db.clear("tasks");
   await db.clear("syncQueue");
   await db.clear("user");
-  // Note: archives intentionally NOT cleared on logout — user keeps their vault
 }
-
 
 export async function upsertQueue(job: QueueJob): Promise<void> {
- const db = await initDB();
- const all = await db.getAll("syncQueue");
-
- const existing = all.find(
-  j => j.taskId === job.taskId && j.action==="update"
- );
-
- if(existing){
-   job.id = existing.id;
-   job.retry = existing.retry || 0;
- }
-
- job.nextRetry = Date.now();
- await db.put("syncQueue", job);
+  const db = await initDB();
+  const all = await db.getAll("syncQueue");
+  const existing = all.find((j) => j.taskId === job.taskId && j.action === "update");
+  if (existing) {
+    job.id = existing.id;
+    job.retry = existing.retry || 0;
+  }
+  job.nextRetry = Date.now();
+  await db.put("syncQueue", job);
 }
 
-
-
-//if Delete :---->old updates remove.
+// Remove all pending update-jobs for a task (called before deleting it)
 export async function removeTaskUpdatesFromQueue(taskId: string): Promise<void> {
- const db = await initDB();
- const all = await db.getAll("syncQueue");
+  const db = await initDB();
+  const all = await db.getAll("syncQueue");
+  for (const j of all) {
+    if (j.taskId === taskId && j.action === "update") {
+      await db.delete("syncQueue", j.id);
+    }
+  }
+}
 
- for(const j of all){
-   if(j.taskId===taskId && j.action==="update"){
-     await db.delete("syncQueue", j.id);
-   }
- }
+// ─── NEW: Remove ALL queue jobs for a list of task IDs at once ───────────────
+export async function removeTasksFromQueue(taskIds: string[]): Promise<void> {
+  if (!taskIds.length) return;
+  const db = await initDB();
+  const all = await db.getAll("syncQueue");
+  const idSet = new Set(taskIds);
+  for (const j of all) {
+    if (idSet.has(j.taskId)) {
+      await db.delete("syncQueue", j.id);
+    }
+  }
+}
+
+// Sections
+export async function getAllSections(
+  userEmail: string,
+  workspaceType: string
+): Promise<Section[]> {
+  if (!userEmail) return [];
+  const db = await initDB();
+  const all = await db.getAll(STORE_SECTIONS);
+  return all
+    .filter((s) => s.userEmail === userEmail && s.workspaceType === workspaceType)
+    .sort((a, b) => a.order - b.order);
+}
+
+export async function upsertSection(section: Section): Promise<void> {
+  const db = await initDB();
+  await db.put(STORE_SECTIONS, section);
+}
+
+export async function deleteSectionFromIDB(id: string): Promise<void> {
+  if (!id) return;
+  const db = await initDB();
+  await db.delete(STORE_SECTIONS, id);
+}
+
+export async function updateTaskSectionInIDB(
+  taskId: string,
+  sectionId: string | null
+): Promise<void> {
+  const db = await initDB();
+  const task = await db.get(STORE_TASKS, taskId);
+  if (!task) return;
+  await db.put(STORE_TASKS, {
+    ...task,
+    sectionId,
+    updatedAt: Date.now(),
+    dirty: true,
+  });
 }

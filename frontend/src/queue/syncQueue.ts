@@ -1,32 +1,43 @@
-// frontend/src/queue/syncQueue.ts
-import { getQueue, removeFromQueue, addTask, getTaskById } from "@/lib/idb";
+import { getQueue, removeFromQueue, addTask, getTaskById, updateQueue } from "@/lib/idb";
 import { authHeaders } from "@/api/authApi";
 
 const API_BASE = "http://localhost:4000";
-
-
+const MAX_RETRY = 5;
 
 export async function processQueue(token: string) {
-
-   // ── if Offline do nothing──
   if (!navigator.onLine) return;
+  if ((processQueue as any)._running) return;
+
   const queue = await getQueue();
   if (queue.length === 0) return;
 
-  // ── Guard: if queue is running already,then skip ──
-  if ((processQueue as any)._running) return;
   (processQueue as any)._running = true;
 
-  const creates = queue.filter(i => i.action === "create");
-  const updates = queue.filter(i => i.action === "update");
-  const deletes = queue.filter(i => i.action === "delete");
+  // Filter out jobs that have exceeded max retries
+  const eligible = queue.filter((i) => (i.retry ?? 0) < MAX_RETRY);
+  const exhausted = queue.filter((i) => (i.retry ?? 0) >= MAX_RETRY);
+
+  // Drop exhausted jobs so they don't clog the queue permanently
+  for (const item of exhausted) {
+    console.warn(`Dropping job ${item.id} after ${MAX_RETRY} retries`);
+    await removeFromQueue(item.id);
+  }
+
+  if (eligible.length === 0) {
+    (processQueue as any)._running = false;
+    return;
+  }
+
+  const creates = eligible.filter((i) => i.action === "create");
+  const updates = eligible.filter((i) => i.action === "update");
+  const deletes = eligible.filter((i) => i.action === "delete");
 
   try {
     if (creates.length > 0) {
       const res = await fetch(`${API_BASE}/tasks/bulk-create`, {
         method: "POST",
         headers: authHeaders(token),
-        body: JSON.stringify({ tasks: creates.map(i => i.payload) })
+        body: JSON.stringify({ tasks: creates.map((i) => i.payload) }),
       });
       if (!res.ok) throw new Error("bulk-create failed");
     }
@@ -36,8 +47,8 @@ export async function processQueue(token: string) {
         method: "PUT",
         headers: authHeaders(token),
         body: JSON.stringify({
-          updates: updates.map(i => ({ taskId: i.taskId, payload: i.payload }))
-        })
+          updates: updates.map((i) => ({ taskId: i.taskId, payload: i.payload })),
+        }),
       });
       if (!res.ok) throw new Error("bulk-update failed");
     }
@@ -46,21 +57,25 @@ export async function processQueue(token: string) {
       const res = await fetch(`${API_BASE}/tasks/bulk-delete`, {
         method: "DELETE",
         headers: authHeaders(token),
-        body: JSON.stringify({ taskIds: deletes.map(i => i.taskId) })
+        body: JSON.stringify({ taskIds: deletes.map((i) => i.taskId) }),
       });
       if (!res.ok) throw new Error("bulk-delete failed");
     }
 
-    // Everything success,,clear the queue
-    for (const item of queue) {
+    // All succeeded — mark tasks as synced and clear queue
+    for (const item of eligible) {
       const task = await getTaskById(item.taskId);
       if (task) await addTask({ ...task, syncStatus: "synced" });
       await removeFromQueue(item.id);
     }
-
   } catch (err) {
-    console.log("Bulk sync failed:", err); 
+    console.warn("Bulk sync failed, incrementing retry counts:", err);
+
+    // Increment retry counter on every failed job so they back off over time
+    for (const item of eligible) {
+      await updateQueue({ ...item, retry: (item.retry ?? 0) + 1 });
+    }
   } finally {
-    (processQueue as any)._running = false; 
+    (processQueue as any)._running = false;
   }
 }

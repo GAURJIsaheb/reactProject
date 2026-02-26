@@ -42,7 +42,7 @@ router.get('/analytics', requireAuth, requireSuperAdmin, asyncHandler(async (req
         $group: {
           _id: null,
           total:     { $sum: 1 },
-          active:    { $sum: { $cond: [{ $and: [{ $eq: ['$completed', false] }, { $eq: ['$deleted', false] }, { $eq: ['$archived', false] }] }, 1, 0] } },
+          active:    { $sum: { $cond: [ { $and: [{ $eq: ['$completed', false] }, { $eq: ['$deleted', false] }, { $eq: ['$archived', false] }] }, 1, 0] } },
           completed: { $sum: { $cond: ['$completed', 1, 0] } },
           archived:  { $sum: { $cond: ['$archived', 1, 0] } },
           deleted:   { $sum: { $cond: ['$deleted', 1, 0] } },

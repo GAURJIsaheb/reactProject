@@ -14,9 +14,7 @@ export interface Task {
   userName?: string;
 
   workspaceType: string;
-
   syncStatus: "pending" | "synced";
+
+  sectionId: string | null; 
 }
-
-
-
