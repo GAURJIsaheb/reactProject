@@ -5,7 +5,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Pencil, Trash2, Check, X, Plus } from "lucide-react";
 import type { Section } from "@/types/section";
 import type { Task } from "@/types/task";
-import TaskCard from "@/components/tasks/taskCard";
+import TaskCard from "@/components/tasks/TaskCard";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface KanbanColumnProps {
