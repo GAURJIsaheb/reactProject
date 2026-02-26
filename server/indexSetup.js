@@ -10,6 +10,9 @@ import passport from "./passport/passport.js";
 
 import adminRoutes from './admin/admin.js';
 
+import sectionsRouter from "./routes/sections.routes.js";
+
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const clientPath = path.join(__dirname, '..', 'client');
@@ -49,6 +52,9 @@ export function createServer() {
 
   app.use('/auth', authRoutes);
   app.use('/admin', adminRoutes);
+
+  //section
+  app.use("/sections", sectionsRouter);
   
   app.use('/pages', express.static(path.join(clientPath, 'pages')));
   app.use(express.static(clientPath));

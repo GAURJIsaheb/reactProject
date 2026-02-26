@@ -1,6 +1,7 @@
-import { createServer } from './setup.js';
+import { createServer } from './indexSetup.js';
 import { registerRoutes } from './routes/index.js';
 import { connectDB } from './mongo/mongo.js';
+
 import path from 'path';
 
 const { app, server, clientPath } = createServer();

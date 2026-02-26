@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { clearSyncTimestamps } from "@/sync/sync";
 
 interface AuthState {
   token: string | null;
@@ -25,6 +26,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
+     clearSyncTimestamps(); 
     localStorage.removeItem("token");
     localStorage.removeItem("userName");
     localStorage.removeItem("userEmail");

@@ -1,12 +1,12 @@
-import { Shield, RefreshCw, LogOut } from "lucide-react";
-import { ago, NEON } from "../utils/helpers";
+import { Shield,LogOut } from "lucide-react";
+import { NEON } from "../utils/helpers";
 import { useAuthStore } from "@/zustand/authStore";
 type Props = {
   lastRefresh: number;
   onRefresh: () => void;
 };
 
-export default function Header({ lastRefresh, onRefresh }: Props) {
+export default function Header({ }: Props) {
   const { logout } = useAuthStore();
 
   return (
@@ -31,22 +31,7 @@ export default function Header({ lastRefresh, onRefresh }: Props) {
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="text-xs text-zinc-500 font-mono">
-          Last sync: {ago(lastRefresh)}
-        </div>
 
-        <button
-          onClick={onRefresh}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg border text-xs font-mono"
-          style={{
-            color: NEON.cyan,
-            background: "rgba(0,245,255,0.08)",
-            borderColor: "rgba(0,245,255,0.2)",
-          }}
-        >
-          <RefreshCw size={14} />
-          Refresh
-        </button>
 
         <button
           onClick={() => logout()}

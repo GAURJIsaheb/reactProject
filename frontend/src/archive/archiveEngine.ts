@@ -69,6 +69,7 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
           userEmail: task.userEmail,
           workspaceType: task.workspaceType,
           image: task.image,
+          sectionId: task.sectionId ?? null, 
         });
 
         const serverPayload = await encryptTask({
@@ -153,11 +154,13 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
           userEmail: string;
           workspaceType: string;
           image: string | null;
+          sectionId: string | null;
         }>(record.encryptedPayload);
 
         // Restore to tasks IndexDB store
         await saveLocalTask({
           ...plain,
+          sectionId: plain.sectionId ?? null,
           archived: false,
           deleted: false,
           syncStatus: "pending",
@@ -198,7 +201,7 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
     // Bulk restore on server
     if (token) {
       try {
-        await apiRestoreAllTasks(userEmail, token);
+        await apiRestoreAllTasks(token);
       } catch {
         console.log("restore-all: offline, will sync later");
       }

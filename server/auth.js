@@ -2,46 +2,33 @@ import express from "express";
 import bcrypt from "bcrypt";
 import passport from "./passport/passport.js";
 import { signToken } from "./jwt.js";
-import { db } from "./mongo/mongo.js";
-import { ObjectId } from "mongodb"; 
+
+import { User }      from './models/User.model.js';
+import { Workspace } from './models/Workspace.model.js';
+
 
 const router = express.Router();
 
-/* ── SIGNUP ── */
+
+// SIGNUP
 router.post("/signup", async (req, res) => {
   const { name, email, password } = req.body;
   if (!email || !name || !password)
     return res.status(400).json({ error: "All fields required" });
 
-  const usersCol = db.collection("users");
-  const existing = await usersCol.findOne({ email });
+  const existing = await User.exists({ email });
   if (existing) return res.status(400).json({ error: "User already exists" });
 
   const hashed = await bcrypt.hash(password, 10);
-  
-  // ← pehle insert, phir _id lo
-  const result = await usersCol.insertOne({ 
-    email, name, password: hashed, createdAt: Date.now() 
-  });
-  const userId = result.insertedId.toString(); // ← real userId
+  const user = await User.create({ email, name, password: hashed });
+  const userId = user._id.toString();
 
-  const wsCol = db.collection("workspaces");
-  await wsCol.insertOne({ 
-    workspaceId: crypto.randomUUID(), 
-    type: "personal",      
-    owner: userId,       
-    members: [userId],   
-    createdAt: Date.now() 
-  });
-  await wsCol.insertOne({ 
-    workspaceId: crypto.randomUUID(), 
-    type: "professional",  
-    owner: userId,       
-    members: [userId],   
-    createdAt: Date.now() 
-  });
+  await Workspace.insertMany([
+    { workspaceId: crypto.randomUUID(), type: 'personal',     owner: user._id, members: [user._id] },
+    { workspaceId: crypto.randomUUID(), type: 'professional', owner: user._id, members: [user._id] },
+  ]);
 
-  const token = signToken({ email, name, userId }); 
+  const token = signToken({ email, name, userId });
   res.json({ token, user: { email, name, userId } });
 });
 
@@ -69,16 +56,15 @@ router.get(
   }
 );
 
+
+// /role route fix:
 router.get(
   "/role",
   passport.authenticate("jwt", { session: false }),
   async (req, res) => {
     try {
       const { userId } = req.user;
-      const user = await db.collection("users").findOne(
-        { _id: new ObjectId(userId) },
-        { projection: { role: 1 } }
-      );
+      const user = await User.findById(userId).select('role').lean();
       res.json({ role: user?.role ?? "user" });
     } catch (err) {
       console.error("Role fetch error:", err);
@@ -86,6 +72,5 @@ router.get(
     }
   }
 );
-
 
 export default router;
