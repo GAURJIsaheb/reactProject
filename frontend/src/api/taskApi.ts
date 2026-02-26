@@ -28,7 +28,7 @@ export async function fetchFromServer(
         completed:     t.completed,
         archived:      t.archived,
         deleted:       t.deleted,
-        sectionId:     t.sectionId ?? null,   // ← was missing
+        sectionId:     t.sectionId ?? null,   
         createdAt:     t.createdAt,
         updatedAt:     t.updatedAt,
         userEmail,
@@ -50,7 +50,7 @@ export async function apiCreateTask(task: any, token: string) {
       text:          task.text,
       image:         task.image ?? null,
       workspaceType: task.workspaceType,
-      sectionId:     task.sectionId ?? null,  // ← was missing
+      sectionId:     task.sectionId ?? null,  
     }),
   });
 

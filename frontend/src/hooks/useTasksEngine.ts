@@ -250,7 +250,6 @@ export function useTasksEngine() {
     } catch (error) {
         const isOffline = !navigator.onLine;
         if (!isOffline) {
-          // Online but server error — log for debugging
           console.error("Server error during task create:", error);
         }
         // Either way, task is safe in IDB with syncStatus: "pending"

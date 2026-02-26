@@ -122,7 +122,7 @@ export const deleteTaskFromIDB = async (id: string): Promise<void> => {
   await tx.done;
 };
 
-// ─── NEW: Hard-delete ALL tasks belonging to a section from IDB ──────────────
+
 // Used when a section is deleted so IDB stays clean (no orphaned tasks).
 export async function deleteTasksBySectionFromIDB(sectionId: string): Promise<string[]> {
   if (!sectionId) return [];
@@ -191,7 +191,7 @@ export async function removeTaskUpdatesFromQueue(taskId: string): Promise<void> 
   }
 }
 
-// ─── NEW: Remove ALL queue jobs for a list of task IDs at once ───────────────
+// ───  Remove ALL queue jobs for a list of task IDs at once ───────────────
 export async function removeTasksFromQueue(taskIds: string[]): Promise<void> {
   if (!taskIds.length) return;
   const db = await initDB();
