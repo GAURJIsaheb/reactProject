@@ -185,12 +185,12 @@ export default function TaskCard({
                 ···
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-40 rounded-xl">
+            <DropdownMenuContent align="end" className="min-w-40 rounded-xl bg-background">
               {!isCompleted && (
                 <>
                   <DropdownMenuItem
                     onClick={() => onEdit(task)}
-                    className="cursor-pointer"
+                    className="cursor-pointer "
                   >
                     <Pencil size={13} className="mr-2 text-yellow-600" />
                     Edit

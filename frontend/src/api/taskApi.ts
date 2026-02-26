@@ -11,68 +11,67 @@ export async function fetchFromServer(
   if (!userEmail || !token) return;
 
   try {
-    const res = await fetch(
-      `${API_BASE}/tasks?&workspaceType=${workspace}`,
-      {
-        headers: authHeaders(token)//token have userId
-      }
-    );
+    const res = await fetch(`${API_BASE}/tasks?workspaceType=${workspace}`, {
+      headers: authHeaders(token),
+    });
 
     if (!res.ok) throw new Error("fetch failed");
 
     const serverTasks = await res.json();
-
     console.log("SERVER → LOCAL SYNC:", serverTasks.length);
 
     for (const t of serverTasks) {
       await addTask({
-        id: t.taskId,
-        text: t.text,
-        image: t.image,
-        completed: t.completed,
-        archived: t.archived,
-        deleted: t.deleted,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt,
-        userEmail: userEmail,
+        id:            t.taskId,
+        text:          t.text,
+        image:         t.image ?? null,
+        completed:     t.completed,
+        archived:      t.archived,
+        deleted:       t.deleted,
+        sectionId:     t.sectionId ?? null,   // ← was missing
+        createdAt:     t.createdAt,
+        updatedAt:     t.updatedAt,
+        userEmail,
         workspaceType: workspace,
-        syncStatus: "synced"
+        syncStatus:    "synced",
       });
     }
-
   } catch (err) {
-    console.log("SERVER SYNC FAILED", err);
+    console.warn("SERVER SYNC FAILED", err);
   }
 }
 
-
 export async function apiCreateTask(task: any, token: string) {
-  await fetch(`${API_BASE}/tasks`, {
-    method: "POST",
+  const res = await fetch(`${API_BASE}/tasks`, {
+    method:  "POST",
     headers: authHeaders(token),
     body: JSON.stringify({
-      id: task.id,
-      text: task.text,
-      image: task.image,
+      id:            task.id,
+      text:          task.text,
+      image:         task.image ?? null,
       workspaceType: task.workspaceType,
-    })
+      sectionId:     task.sectionId ?? null,  // ← was missing
+    }),
   });
+
+  if (!res.ok) throw new Error("create failed");
 }
 
 export async function apiUpdateTask(id: string, payload: any, token: string) {
   const res = await fetch(`${API_BASE}/tasks/${id}`, {
-    method: "PUT",
+    method:  "PUT",
     headers: authHeaders(token),
-    body: JSON.stringify(payload)
+    body:    JSON.stringify(payload),
   });
 
   if (!res.ok) throw new Error("update failed");
 }
 
 export async function apiDeleteTask(id: string, token: string) {
-  await fetch(`${API_BASE}/tasks/${id}`, {
-    method: "DELETE",
-    headers: authHeaders(token)
+  const res = await fetch(`${API_BASE}/tasks/${id}`, {
+    method:  "DELETE",
+    headers: authHeaders(token),
   });
-}
 
+  if (!res.ok) throw new Error("delete failed");
+}
