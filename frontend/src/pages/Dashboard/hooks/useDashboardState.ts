@@ -1,6 +1,5 @@
 import { useState, useRef } from "react";
 import type { Task } from "@/types/task";
-import type { SortType } from "../SortToggle";
 
 export function useDashboardState() {
   const [loading, setLoading] = useState(true);
@@ -9,7 +8,7 @@ export function useDashboardState() {
   const [editTask, setEditTask] = useState<Task | null>(null);
 
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<SortType>("new");
+  const [sort, setSort] = useState<string>("new");
 
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
 

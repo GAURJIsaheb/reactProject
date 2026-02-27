@@ -27,10 +27,7 @@ const docs = tasks.map(t => ({
 }));
 
 
-  //console.log('Docs to insert:', JSON.stringify(docs.map(d => ({ _id: d._id, userId: d.userId }))));
   await Archive.insertMany(docs, { ordered: false }).catch(err => {
- // console.log('Archive error:', err.code, err.message);
-  //console.log('WriteErrors:', JSON.stringify(err.writeErrors?.slice(0,2)));
   if (err.code !== 11000) throw err;
 });
 

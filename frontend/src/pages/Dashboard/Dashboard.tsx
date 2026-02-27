@@ -65,7 +65,7 @@ export default function Dashboard() {
 
   // ───────── DERIVED DATA ─────────
   const derived = useDashboardDerived(tasks, sections, search, sort, activeSectionId);
-  const { activeTasks, completedTasks, hasNoSections, sortedTasks } = derived;
+  const { activeTasks, completedTasks, hasNoSections, sortedTasks , activeSectionLabel} = derived;
 
   // ───────── SYNC ENGINE ─────────
   useWorkspaceSync(
@@ -146,6 +146,7 @@ export default function Dashboard() {
               imageFile={imageFile}
               setImageFile={setImageFile}
               handleAdd={actions.handleAdd}
+              sectionName={activeSectionLabel ?? undefined}
             />
           )}
 

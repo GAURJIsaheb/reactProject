@@ -6,7 +6,7 @@ import { registerCronJobs } from './cron/cleanupJobs.js';
 
 import path from 'path';
 
-const { app, server, clientPath } = createServer();
+const { app, clientPath } = createServer();
 
 registerRoutes(app);
 
@@ -21,8 +21,8 @@ app.use((err, req, res, next) => {
 
 async function start() {
   await connectDB();
-  registerCronJobs();   // ← after DB is ready, before listen
-  server.listen(4000, () => console.log('Server on 4000 + Mongo'));
+  registerCronJobs();   // ← after DB is ready, 
+  app.listen(4000, () => console.log('Server on 4000 + Mongo'));
 }
 
 start();

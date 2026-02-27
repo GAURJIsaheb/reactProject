@@ -1,6 +1,4 @@
 import express from 'express';
-import http from 'http';
-import { Server } from 'socket.io';
 import cors from 'cors';
 import session from 'express-session';
 import path from 'path';
@@ -20,18 +18,11 @@ import cronAdminRouter from './cron/cronAdmin.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const clientPath = path.join(__dirname, '..', 'client');
+const clientPath = path.join(__dirname, '..', 'client');//.. means go 1 level up at project/frontend
 
 export function createServer() {
   const app = express();
-  const server = http.createServer(app);
 
-  const io = new Server(server, {
-    cors: {
-      origin: ['http://localhost:5173', 'http://localhost:4000'],
-      credentials: true
-    }
-  });
 
   app.use(cors({
     origin: ['http://localhost:5173', 'http://localhost:4000'],
@@ -55,11 +46,10 @@ export function createServer() {
   app.use(passport.initialize()); 
 
 
-  app.use('/auth', authRoutes);
+  app.use('/auth', authRoutes);//login,signup
   app.use('/admin', adminRoutes);
 
-  //section
-  app.use("/sections", sectionsRouter);
+
   
   app.use('/pages', express.static(path.join(clientPath, 'pages')));
 
@@ -68,5 +58,5 @@ export function createServer() {
   
   app.use(express.static(clientPath));
 
-  return { app, server, io, clientPath };
+  return { app,clientPath };
 }

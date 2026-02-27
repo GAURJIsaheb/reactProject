@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const archiveSchema = new mongoose.Schema({
-  _id:              { type: String },   // taskId as _id
+  _id:              { type: String },   
   userId:           { type: mongoose.Schema.Types.ObjectId, ref: 'users', required: true },
   workspaceId:      { type: String, ref: 'workspaces', required: true },
   encryptedPayload: { type: mongoose.Schema.Types.Mixed, default: null },
