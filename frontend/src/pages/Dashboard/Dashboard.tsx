@@ -7,7 +7,6 @@ import { useTheme } from "@/components/toggleTheme/theme";
 import HeaderSection from "./components/HeaderSection";
 import StatsBar from "./components/StatsBar";
 import SearchBar from "./components/SearchBar";
-import SortToggle from "./SortToggle";
 import Archive from "@/archive/archive";
 import KanbanBoard from "./kanban/KanbanBoard";
 import EmptyBoardState from "./components/EmptyBoardState";
@@ -56,7 +55,7 @@ export default function Dashboard() {
     viewTask, setViewTask,
     editTask, setEditTask,
     search, setSearch,
-    sort, setSort,
+    sort,
     activeSectionId, setActiveSectionId,
     input, setInput,
     imageFile, setImageFile,
@@ -65,20 +64,8 @@ export default function Dashboard() {
   } = state;
 
   // ───────── DERIVED DATA ─────────
-  const derived = useDashboardDerived(
-    tasks,
-    sections,
-    search,
-    sort,
-    activeSectionId
-  );
-
-  const {
-    activeTasks,
-    completedTasks,
-    hasNoSections,
-    sortedTasks,
-  } = derived;
+  const derived = useDashboardDerived(tasks, sections, search, sort, activeSectionId);
+  const { activeTasks, completedTasks, hasNoSections, sortedTasks } = derived;
 
   // ───────── SYNC ENGINE ─────────
   useWorkspaceSync(
@@ -93,25 +80,15 @@ export default function Dashboard() {
 
   // ───────── TASK ACTIONS ─────────
   const actions = useTaskActions({
-    input,
-    setInput,
-    imageFile,
-    setImageFile,
-    activeSectionId,
-    setActiveSectionId,
-    sections,
-    hasNoSections,
-    tasks,
-    createTask,
-    deleteTask,
-    reloadTasks,
-    workspace,
-    userEmail,
-    token,
-    taskInputRef
+    input, setInput,
+    imageFile, setImageFile,
+    activeSectionId, setActiveSectionId,
+    sections, hasNoSections,
+    tasks, createTask, deleteTask, reloadTasks,
+    workspace, userEmail, token, taskInputRef
   });
 
-  // ───────── UI BOOT LOADING ─────────
+  // ───────── BOOT LOADING ─────────
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 700);
     return () => clearTimeout(t);
@@ -124,6 +101,13 @@ export default function Dashboard() {
   // ───────── RENDER ─────────
   return (
     <>
+      {/* Ambient background orbs */}
+      <div className="dash-orbs" aria-hidden="true">
+        <div className="dash-orb dash-orb-1" />
+        <div className="dash-orb dash-orb-2" />
+        <div className="dash-orb dash-orb-3" />
+      </div>
+
       <div className="dash-root">
         <div className="dash-inner">
 
@@ -144,18 +128,16 @@ export default function Dashboard() {
 
           <Archive tasks={tasks} onTasksChanged={reloadTasks} />
 
-          <div className="w-full mb-5">
+          {/* Search + Sort row */}
+          <div className="w-[98%] ml-2 mb-5">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="flex-1 min-w-0">
                 <SearchBar value={search} onChange={setSearch} />
               </div>
-              <div className="shrink-0">
-                <SortToggle sort={sort} setSort={setSort} />
-              </div>
             </div>
           </div>
 
-          {/* INPUT BAR (UNCHANGED UI) */}
+          {/* Task input bar */}
           {activeSectionId && !hasNoSections && (
             <InputSection
               ref={taskInputRef}
@@ -167,7 +149,7 @@ export default function Dashboard() {
             />
           )}
 
-          {/* BOARD */}
+          {/* Board */}
           {loading ? (
             <KanbanSkeleton count={3} />
           ) : hasNoSections ? (

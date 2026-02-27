@@ -163,6 +163,7 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
           sectionId: plain.sectionId ?? null,
           archived: false,
           deleted: false,
+          deletedAt:  null,   
           syncStatus: "pending",
         });
 

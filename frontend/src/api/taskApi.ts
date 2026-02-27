@@ -28,7 +28,8 @@ export async function fetchFromServer(
         completed:     t.completed,
         archived:      t.archived,
         deleted:       t.deleted,
-        sectionId:     t.sectionId ?? null,   
+        deletedAt:     t.deletedAt ?? null,   
+        sectionId:     t.sectionId ?? null,
         createdAt:     t.createdAt,
         updatedAt:     t.updatedAt,
         userEmail,
@@ -50,7 +51,7 @@ export async function apiCreateTask(task: any, token: string) {
       text:          task.text,
       image:         task.image ?? null,
       workspaceType: task.workspaceType,
-      sectionId:     task.sectionId ?? null,  
+      sectionId:     task.sectionId ?? null,
     }),
   });
 

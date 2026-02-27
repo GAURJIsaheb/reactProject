@@ -4,6 +4,7 @@ export interface Task {
   completed: boolean;
   archived: boolean;
   deleted?: boolean;
+  deletedAt:     number | null; 
 
   image?: string | null;
 

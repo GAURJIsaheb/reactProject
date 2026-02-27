@@ -106,8 +106,12 @@ export const bulkUpdateTasks = asyncHandler(async (req, res) => {
   res.json({ ok: true, modified: result.modifiedCount });
 });
 
+// ─── Soft delete — stamps deletedAt so the cron can hard-delete after 30 days ─
 export const deleteTask = asyncHandler(async (req, res) => {
-  await Task.updateOne({ taskId: req.params.id }, { $set: { deleted: true, updatedAt: Date.now() } });
+  await Task.updateOne(
+    { taskId: req.params.id },
+    { $set: { deleted: true, deletedAt: Date.now(), updatedAt: Date.now() } }
+  );
   res.json({ status: 'ok' });
 });
 
@@ -115,17 +119,16 @@ export const bulkDeleteTasks = asyncHandler(async (req, res) => {
   const { taskIds } = req.body;
   if (!taskIds?.length) return res.json({ ok: true });
 
+  const now = Date.now();
   const result = await Task.updateMany(
     { taskId: { $in: taskIds } },
-    { $set: { deleted: true, updatedAt: Date.now() } }
+    { $set: { deleted: true, deletedAt: now, updatedAt: now } }
   );
   res.json({ ok: true, deleted: result.modifiedCount });
 });
 
 // ─── Sync ─────────────────────────────────────────────────────────────────────
 
-// GET /tasks/workspace-id?workspaceType=personal
-// Frontend calls this once per workspace to get the UUID workspaceId
 export const getWorkspaceId = asyncHandler(async (req, res) => {
   const { workspaceType } = req.query;
   const { userId } = req.user;
@@ -140,9 +143,6 @@ export const getWorkspaceId = asyncHandler(async (req, res) => {
   res.json({ workspaceId: ws.workspaceId });
 });
 
-// GET /tasks/sync?workspaceId=xxx&lastSyncedAt=timestamp
-// Delta sync — returns only records changed AFTER lastSyncedAt
-// No createdBy filter — admin-inserted tasks also sync correctly
 export const syncTasks = asyncHandler(async (req, res) => {
   const { lastSyncedAt, workspaceId } = req.query;
   const since = lastSyncedAt ? Number(lastSyncedAt) : 0;
@@ -152,7 +152,6 @@ export const syncTasks = asyncHandler(async (req, res) => {
     updatedAt: { $gt: since },
   }).lean();
 
-  // Map taskId → id so IDB keyPath "id" matches
   const mapped = tasks.map((t) => ({
     ...t,
     id: t.taskId,

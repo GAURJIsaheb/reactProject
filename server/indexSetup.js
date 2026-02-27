@@ -7,10 +7,15 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import authRoutes from './auth.js';
 import passport from "./passport/passport.js"; 
+import { requireAuth } from './middlewares/requireAuth.js';
 
 import adminRoutes from './admin/admin.js';
 
 import sectionsRouter from "./routes/sections.routes.js";
+
+//cron job admin routes
+import cronAdminRouter from './cron/cronAdmin.routes.js';
+
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -57,6 +62,10 @@ export function createServer() {
   app.use("/sections", sectionsRouter);
   
   app.use('/pages', express.static(path.join(clientPath, 'pages')));
+
+  //cron job
+  app.use('/admin/crons', requireAuth, cronAdminRouter);
+  
   app.use(express.static(clientPath));
 
   return { app, server, io, clientPath };
