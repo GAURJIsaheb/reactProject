@@ -57,7 +57,7 @@ router.get(
 );
 
 
-// /role route fix:
+
 router.get(
   "/role",
   passport.authenticate("jwt", { session: false }),

@@ -18,7 +18,7 @@ export default function TasksPerUserChart({ data }:Props) {
         Tasks per User (Top 10)
       </div>
 
-      <ResponsiveContainer width="100%" height={220}>
+      <ResponsiveContainer width="100%" height={440}>
         <BarChart data={data} layout="vertical">
           <CartesianGrid stroke="#1a1a1a" strokeDasharray="3 3" />
           <XAxis type="number"  tick={{ fill: "#666", fontSize: 10 }} />

@@ -78,7 +78,7 @@ export default function Archive({ tasks, onTasksChanged }: ArchiveProps) {
       {/* Trigger */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-card border border-border text-foreground text-sm font-medium hover:bg-amber-500/10 hover:border-amber-400/40 hover:text-amber-300 transition-all duration-200"
+        className="flex items-center gap-2.5 px-4 ml-2 py-2 rounded-xl bg-card border border-border text-foreground text-sm font-medium hover:bg-amber-500/10 hover:border-amber-400/40 hover:text-amber-300 transition-all duration-200"
       >
         <ArchiveIcon size={15} className="opacity-70" />
         <span>Archive</span>

@@ -34,13 +34,14 @@ router.get('/analytics', requireAuth, requireSuperAdmin, asyncHandler(async (req
   ] = await Promise.all([
 
     // 1. Task status counts
-    Task.aggregate([
+    Task.aggregate([//compound indexing working in schemaL:({ deleted: 1, deletedAt: 1 });
+      { $match: { deleted: false } },//only non-delete tasks
       {
         $group: {
           _id: null,
           total:     { $sum: 1 },
-          active:    { $sum: { $cond: [{ $and: [{ $eq: ['$completed', false] }, { $eq: ['$deleted', false] }, { $eq: ['$archived', false] }] }, 1, 0] } },
-          completed: { $sum: { $cond: ['$completed', 1, 0] } },
+          active:    { $sum: { $cond: [{ $and: [{ $eq: ['$completed', false] }, { $eq: ['$archived', false] }] }, 1, 0] } },
+          completed: { $sum: { $cond: ['$completed', 1, 0] } },//if completed,true shorthand
           archived:  { $sum: { $cond: ['$archived',  1, 0] } },
           deleted:   { $sum: { $cond: ['$deleted',   1, 0] } },
           withImage: { $sum: { $cond: [{ $and: ['$image', { $ne: ['$image', null] }] }, 1, 0] } },
@@ -50,19 +51,15 @@ router.get('/analytics', requireAuth, requireSuperAdmin, asyncHandler(async (req
 
     // 2. Tasks per user
     Task.aggregate([
-      { $match: { deleted: false } },
+      { $match: { deleted: false } },//compund indexing working
       { $group: { _id: '$createdBy', count: { $sum: 1 }, completed: { $sum: { $cond: ['$completed', 1, 0] } } } },
-      { $sort: { count: -1 } },
-      { $limit: 10 },
+      { $sort: { count: -1 } },//sort by count decending
+      { $limit: 10 },//after sorting keep only 10 users --- > top 10 users with highest tasks count
       {
         $lookup: {
-          from: 'users',
-          let: { uid: '$_id' },
-          pipeline: [
-            { $addFields: { strId: { $toString: '$_id' } } },
-            { $match: { $expr: { $eq: ['$strId', '$$uid'] } } },
-            { $project: { name: 1, email: 1 } }
-          ],
+          from: 'users',//tasks with users
+          localField: '_id',
+          foreignField: '_id',
           as: 'userInfo'
         }
       },
@@ -73,21 +70,17 @@ router.get('/analytics', requireAuth, requireSuperAdmin, asyncHandler(async (req
     // 3. Top users by activity
     Task.aggregate([
       { $match: { deleted: false } },
-      { $group: { _id: '$createdBy', taskCount: { $sum: 1 }, avgVersion: { $avg: '$version' }, lastActive: { $max: '$updatedAt' } } },
+      { $group: { _id: '$createdBy', taskCount: { $sum: 1 }, avgVersion: { $avg: '$version' }, lastActive: { $max: '$updatedAt' } } },//max updated at..most recent update
       { $sort: { avgVersion: -1, taskCount: -1 } },
       { $limit: 5 },
       {
         $lookup: {
           from: 'users',
-          let: { uid: '$_id' },
-          pipeline: [
-            { $addFields: { strId: { $toString: '$_id' } } },
-            { $match: { $expr: { $eq: ['$strId', '$$uid'] } } },
-            { $project: { name: 1, email: 1 } }
-          ],
+          localField: '_id',
+          foreignField: '_id',
           as: 'userInfo'
         }
-      },
+},
       { $unwind: { path: '$userInfo', preserveNullAndEmptyArrays: true } },
       { $project: { name: '$userInfo.name', email: '$userInfo.email', taskCount: 1, avgVersion: 1, lastActive: 1 } }
     ]),
@@ -96,7 +89,11 @@ router.get('/analytics', requireAuth, requireSuperAdmin, asyncHandler(async (req
     Task.aggregate([
       { $match: { deleted: false } },
       { $addFields: { hour: { $hour: { $toDate: '$createdAt' } } } },
-      { $group: { _id: '$hour', count: { $sum: 1 } } },
+                                  /*Converts number → BSON Date object.
+                                    So if createdAt = 1709025600000
+                                    It becomes: 2024-02-27T10:00:00Z
+                                    */
+      { $group: { _id: '$hour', count: { $sum: 1 } } },//_id = hour (0–23),
       { $sort: { _id: 1 } }
     ]),
 
@@ -116,12 +113,8 @@ router.get('/analytics', requireAuth, requireSuperAdmin, asyncHandler(async (req
       {
         $lookup: {
           from: 'users',
-          let: { uid: '$createdBy' },
-          pipeline: [
-            { $addFields: { strId: { $toString: '$_id' } } },
-            { $match: { $expr: { $eq: ['$strId', '$$uid'] } } },
-            { $project: { name: 1, email: 1 } }
-          ],
+          localField: 'createdBy',
+          foreignField: '_id',
           as: 'userInfo'
         }
       },
@@ -130,7 +123,10 @@ router.get('/analytics', requireAuth, requireSuperAdmin, asyncHandler(async (req
     ]),
 
     // 7. Total users
-    User.countDocuments(),
+    //User.countDocuments(),
+    User.aggregate([
+        { $group: { _id: null, totalUsers: { $sum: 1 } } }
+      ]),
 
     // 8. Growth over last 30 days
     Task.aggregate([
@@ -145,7 +141,7 @@ router.get('/analytics', requireAuth, requireSuperAdmin, asyncHandler(async (req
       { $sort: { _id: 1 } }
     ]),
 
-    // 9. Archive stats
+    // 9.Ttal Archive stats
     Archive.aggregate([
       {
         $group: {
@@ -198,10 +194,17 @@ router.get('/users', requireAuth, requireSuperAdmin, asyncHandler(async (req, re
     {
       $lookup: {
         from: 'tasks',
-        let: { uid: { $toString: '$_id' } },
+        localField: '_id',
+        foreignField: 'createdBy',
         pipeline: [
-          { $match: { $expr: { $eq: ['$createdBy', '$$uid'] }, deleted: false } },
-          { $group: { _id: null, total: { $sum: 1 }, completed: { $sum: { $cond: ['$completed', 1, 0] } } } }
+          { $match: { deleted: false } },
+          {
+            $group: {
+              _id: null,
+              total: { $sum: 1 },
+              completed: { $sum: { $cond: ['$completed', 1, 0] } }
+            }
+          }
         ],
         as: 'taskStats'
       }

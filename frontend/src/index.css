@@ -95,6 +95,207 @@
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
 }
+.kanban-board-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(139, 92, 246, 0.25) transparent;
+}
+
+.kanban-board-scroll::-webkit-scrollbar { height: 5px; }
+.kanban-board-scroll::-webkit-scrollbar-track { background: transparent; }
+.kanban-board-scroll::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.25);
+    border-radius: 99px;
+}
+.kanban-board-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.45);
+}
+
+@keyframes columnReveal {
+    from { opacity: 0; transform: translateY(16px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.kanban-board-scroll > * { animation: columnReveal 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.kanban-board-scroll > *:nth-child(1) { animation-delay: 0ms; }
+.kanban-board-scroll > *:nth-child(2) { animation-delay: 60ms; }
+.kanban-board-scroll > *:nth-child(3) { animation-delay: 120ms; }
+.kanban-board-scroll > *:nth-child(4) { animation-delay: 180ms; }
+.kanban-board-scroll > *:nth-child(5) { animation-delay: 240ms; }
+.kanban-board-scroll > *:nth-child(6) { animation-delay: 300ms; }
+
+/* ═══════════════════════════════════════════════════
+   KANBAN COLUMN — DARK MODE (default)
+═══════════════════════════════════════════════════ */
+
+.kanban-col {
+    background: linear-gradient(145deg, rgba(16,16,28,0.95) 0%, rgba(20,18,35,0.95) 100%);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.04) inset;
+    backdrop-filter: blur(20px);
+}
+
+.kanban-col[data-over="true"] {
+    background: linear-gradient(145deg, rgba(20,20,36,0.97) 0%, rgba(28,22,48,0.97) 100%);
+    border-color: var(--col-border-d);
+    box-shadow:
+        0 0 0 1px var(--col-border-d),
+        0 8px 40px var(--col-glow-d),
+        0 2px 8px rgba(0,0,0,0.4);
+}
+
+.kanban-col__header {
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.kanban-col__title { color: #e2e8f0; }
+.kanban-col__grip  { color: rgba(255,255,255,0.15); }
+.kanban-col__grip:hover { color: rgba(255,255,255,0.40); }
+
+.kanban-col__badge {
+    background: var(--col-badge-bg-d);
+    color: var(--col-badge-text-d);
+}
+
+.kanban-col__action-btn {
+    color: #475569;
+}
+.kanban-col__action-btn:hover {
+    color: #cbd5e1;
+    background: rgba(255,255,255,0.07);
+}
+
+.kanban-col__rename-input { color: #e2e8f0; }
+
+.kanban-col__progress-label { color: #475569; }
+.kanban-col__progress-track { background: rgba(255,255,255,0.05); }
+
+.kanban-col__empty-text { color: #334155; }
+
+.kanban-col__drop-zone[data-over="true"] {
+    background: var(--col-glow-d);
+}
+
+.kanban-col__drop-target {
+    border: 2px dashed var(--col-border-d);
+    background: var(--col-glow-d);
+}
+.kanban-col__drop-target-text { color: var(--col-badge-text-d); }
+
+.kanban-col__cancel-btn {
+    border-color: rgba(255,255,255,0.08);
+    color: #64748b;
+}
+.kanban-col__cancel-btn:hover {
+    color: #cbd5e1;
+    border-color: rgba(255,255,255,0.15);
+}
+
+.kanban-col__add-btn {
+    border-top: 1px solid rgba(255,255,255,0.05);
+    color: rgba(148,163,184,0.45);
+}
+.kanban-col__add-btn:hover {
+    background: var(--col-glow-d);
+    color: var(--col-badge-text-d);
+}
+
+/* ═══════════════════════════════════════════════════
+   KANBAN COLUMN — LIGHT MODE OVERRIDES
+═══════════════════════════════════════════════════ */
+
+:root:not(.dark) .kanban-col,
+html:not(.dark) .kanban-col {
+    background: linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(250,249,255,0.98) 100%);
+    border: 1px solid rgba(0,0,0,0.07);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06), 0 1px 0 rgba(255,255,255,0.9) inset;
+}
+
+:root:not(.dark) .kanban-col[data-over="true"],
+html:not(.dark) .kanban-col[data-over="true"] {
+    background: linear-gradient(145deg, rgba(255,255,255,1) 0%, rgba(252,251,255,1) 100%);
+    border-color: var(--col-border-l);
+    box-shadow:
+        0 0 0 1px var(--col-border-l),
+        0 8px 40px var(--col-glow-l),
+        0 2px 8px rgba(0,0,0,0.05);
+}
+
+:root:not(.dark) .kanban-col__header,
+html:not(.dark) .kanban-col__header {
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+:root:not(.dark) .kanban-col__title,
+html:not(.dark) .kanban-col__title { color: #1e1b4b; }
+
+:root:not(.dark) .kanban-col__grip,
+html:not(.dark) .kanban-col__grip { color: rgba(0,0,0,0.18); }
+
+:root:not(.dark) .kanban-col__badge,
+html:not(.dark) .kanban-col__badge {
+    background: var(--col-badge-bg-l);
+    color: var(--col-badge-text-l);
+}
+
+:root:not(.dark) .kanban-col__action-btn,
+html:not(.dark) .kanban-col__action-btn { color: #94a3b8; }
+
+:root:not(.dark) .kanban-col__action-btn:hover,
+html:not(.dark) .kanban-col__action-btn:hover {
+    color: #334155;
+    background: rgba(0,0,0,0.05);
+}
+
+:root:not(.dark) .kanban-col__rename-input,
+html:not(.dark) .kanban-col__rename-input { color: #1e1b4b; }
+
+:root:not(.dark) .kanban-col__progress-label,
+html:not(.dark) .kanban-col__progress-label { color: #94a3b8; }
+
+:root:not(.dark) .kanban-col__progress-track,
+html:not(.dark) .kanban-col__progress-track { background: rgba(0,0,0,0.07); }
+
+:root:not(.dark) .kanban-col__empty-text,
+html:not(.dark) .kanban-col__empty-text { color: #94a3b8; }
+
+:root:not(.dark) .kanban-col__drop-zone[data-over="true"],
+html:not(.dark) .kanban-col__drop-zone[data-over="true"] {
+    background: var(--col-glow-l);
+}
+
+:root:not(.dark) .kanban-col__drop-target,
+html:not(.dark) .kanban-col__drop-target {
+    border: 2px dashed var(--col-border-l);
+    background: var(--col-glow-l);
+}
+
+:root:not(.dark) .kanban-col__drop-target-text,
+html:not(.dark) .kanban-col__drop-target-text {
+    color: var(--col-badge-text-l);
+}
+
+:root:not(.dark) .kanban-col__cancel-btn,
+html:not(.dark) .kanban-col__cancel-btn {
+    border-color: rgba(0,0,0,0.10);
+    color: #64748b;
+}
+:root:not(.dark) .kanban-col__cancel-btn:hover,
+html:not(.dark) .kanban-col__cancel-btn:hover {
+    color: #1e293b;
+    border-color: rgba(0,0,0,0.18);
+}
+
+:root:not(.dark) .kanban-col__add-btn,
+html:not(.dark) .kanban-col__add-btn {
+    border-top: 1px solid rgba(0,0,0,0.06);
+    color: rgba(100,116,139,0.6);
+}
+:root:not(.dark) .kanban-col__add-btn:hover,
+html:not(.dark) .kanban-col__add-btn:hover {
+    background: var(--col-glow-l);
+    color: var(--col-badge-text-l);
+}
+
 
 @layer base {
   * {

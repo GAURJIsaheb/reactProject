@@ -12,7 +12,7 @@ export default function ActivityFeed({ recentActivity }: Props) {
         Live Activity Feed
       </div>
 
-      <div className="flex flex-col gap-3 max-h-70 overflow-y-auto">
+      <div className="flex flex-col gap-3 max-h-70 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {recentActivity.map((t, i) => {
           const txt = t.text ?? "";
 
