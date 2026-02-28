@@ -1,4 +1,4 @@
-import { getQueue, removeFromQueue, addTask, getTaskById, updateQueue } from "@/lib/idb";
+import { getQueue, removeFromQueue, addTask, getTaskById, updateQueue } from "@/infrastructure/lib/idb";
 import { authHeaders } from "@/api/authApi";
 
 const API_BASE = "http://localhost:4000";

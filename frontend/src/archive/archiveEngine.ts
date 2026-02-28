@@ -4,7 +4,7 @@
 
 import { useState, useCallback } from "react";
 import { useAuthStore } from "@/zustand/authStore";
-import type { Task } from "@/types/task";
+import type { Task } from "@/shared/types/task";
 import { deleteLocalTask, saveLocalTask } from "@/hooks/indexdbLayer"; 
 
 import { encryptTask, decryptTask } from "./archiveService";
@@ -12,7 +12,7 @@ import {
   getAllArchivedTasks,
   saveArchivedToDB,
   deleteArchivedFromDB,
-} from "@/lib/idb";
+} from "@/infrastructure/lib/idb";
 
 export interface ArchivedTask {
   id: string;

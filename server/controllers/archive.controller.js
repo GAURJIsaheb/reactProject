@@ -10,13 +10,12 @@ export const bulkArchive = asyncHandler(async (req, res) => {
   if (!Array.isArray(tasks) || !tasks.length)
     return res.status(400).json({ error: 'tasks array required' });
 
- // archive.controller.js mein ye check add karo
+
 const workspace = await Workspace.findOne({
   owner: userId,
   type: tasks[0]?.workspaceType ?? 'personal',
 }).lean();
 
-// workspace null bhi ho toh chalega — workspaceId optional rakho
 const docs = tasks.map(t => ({
   _id:              t.id,
   userId,

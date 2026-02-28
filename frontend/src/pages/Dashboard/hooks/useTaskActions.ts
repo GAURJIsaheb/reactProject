@@ -2,11 +2,10 @@ import { useCallback } from "react";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 
-import { fileToBase64 } from "@/utils/fileToBase64";
-import { authHeaders } from "@/api/authApi";
-import { addTask, upsertQueue } from "@/lib/idb";
+import { addTask, upsertQueue } from "@/infrastructure/lib/idb";
+import { apiUpdateTask } from "@/api/taskApi";
 
-import type { Task } from "@/types/task";
+import type { Task } from "@/shared/types/task";
 
 type Props = {
   input: string;
@@ -23,7 +22,7 @@ type Props = {
 
   tasks: Task[];
 
-  createTask: (text: string, image: string | null, sectionId: string) => Promise<void>;
+  createTask: (text: string, image: File | null, sectionId: string) => Promise<void>;
   deleteTask: (id: string) => void;
   reloadTasks: () => Promise<void>;
 
@@ -50,7 +49,7 @@ export function useTaskActions({
   workspace,
   userEmail,
   token,
-  taskInputRef
+  taskInputRef,
 }: Props) {
 
   // ─── ADD TASK ─────────────────────────────────────────────
@@ -62,83 +61,80 @@ export function useTaskActions({
     const targetSectionId = activeSectionId ?? sections[0]?.id ?? null;
     if (!targetSectionId) return;
 
-    let base64: string | null = null;
-    if (imageFile) base64 = await fileToBase64(imageFile);
+    // Pass raw File — NO base64 conversion
+    const fileToUpload = imageFile ?? null;
 
     setInput("");
     setImageFile(null);
 
-    await createTask(trimmed, base64, targetSectionId);
+    await createTask(trimmed, fileToUpload, targetSectionId);
 
     toast.success("✨ Task added!", {
       description: `"${trimmed}"`,
       duration: 2500,
     });
 
-  }, [
-    input,
-    imageFile,
-    activeSectionId,
-    sections,
-    hasNoSections,
-    createTask
-  ]);
+  }, [input, imageFile, activeSectionId, sections, hasNoSections, createTask]);
 
   // ─── DELETE TASK ──────────────────────────────────────────
 
   const handleDelete = useCallback((id: string) => {
-    const task = tasks.find(t => t.id === id);
+    const task = tasks.find((t) => t.id === id);
     deleteTask(id);
 
     toast.success("🧹 Task deleted", {
       description: task ? `"${task.text}"` : "Task removed",
       duration: 2500,
     });
-
   }, [tasks, deleteTask]);
 
   // ─── EDIT SAVE ────────────────────────────────────────────
 
   const handleEditSave = useCallback(
-    async (id: string, text: string, image?: string | null) => {
+    async (
+      id: string,
+      text: string,
+      imageFile?: File | null,
+      removeImage?: boolean
+    ) => {
       if (!userEmail) return;
 
-      const updatedTask = {
+      // IDB optimistic update — clear image if removing, keep existing if no change
+      const idbUpdate: any = {
         id,
         text,
-        image: image ?? null,
         userEmail,
         workspaceType: workspace,
         updatedAt: Date.now(),
         dirty: true,
       };
+      if (removeImage) idbUpdate.image = null;
 
-      // IDB update
-      await addTask(updatedTask);
+      await addTask(idbUpdate);
 
-      // queue update
+      // Queue for offline retry
       await upsertQueue({
         id: uuidv4(),
         action: "update",
         taskId: id,
         userEmail,
         workspaceType: workspace,
-        payload: updatedTask,
+        payload: { text, ...(removeImage ? { image: null } : {}) },
         retry: 0,
         nextRetry: Date.now(),
       });
 
-      // try online push
+      // Online push via FormData
       try {
         if (!token) return;
+        const result = await apiUpdateTask(id, { text }, token, imageFile, removeImage);
 
-        await fetch(`http://localhost:4000/tasks/${id}`, {
-          method: "PUT",
-          headers: authHeaders(token),
-          body: JSON.stringify({ text, image }),
-        });
+        // Update IDB with fresh signed URL from server
+        if (result?.task?.imageUrl) {
+          await addTask({ id, image: result.task.imageUrl });
+        }
       } catch {
-        // offline — queue handles retry
+        // offline — queue handles it
       }
 
       await reloadTasks();
@@ -150,20 +146,21 @@ export function useTaskActions({
 
   const handleTaskAddInSection = useCallback((sectionId: string) => {
     setActiveSectionId(sectionId);
-
     requestAnimationFrame(() => {
       taskInputRef.current?.focus();
     });
-
   }, []);
 
   const handleClearSection = useCallback(() => {
     setActiveSectionId(null);
   }, []);
 
-  const handleCreateFirstSection = useCallback((createSection: (t: string) => void) => {
-    createSection("My Tasks");
-  }, []);
+  const handleCreateFirstSection = useCallback(
+    (createSection: (t: string) => void) => {
+      createSection("My Tasks");
+    },
+    []
+  );
 
   return {
     handleAdd,
@@ -171,6 +168,6 @@ export function useTaskActions({
     handleEditSave,
     handleTaskAddInSection,
     handleClearSection,
-    handleCreateFirstSection
+    handleCreateFirstSection,
   };
 }

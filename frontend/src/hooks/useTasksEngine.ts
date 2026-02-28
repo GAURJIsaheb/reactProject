@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
-import { initDB } from "@/lib/idb";
+import { initDB } from "@/infrastructure/lib/idb";
 import { useAuthStore } from "@/zustand/authStore";
-import type { Task } from "@/types/task";
-import { processQueue } from "@/queue/syncQueue";
+import type { Task } from "@/shared/types/task";
+import { processQueue } from "@/infrastructure/queue/syncQueue";
 
 import {
   loadLocalTasks,
@@ -29,22 +29,36 @@ export function useTasksEngine() {
   const { userEmail, token } = useAuthStore();
 
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [workspace, setWorkspace] = useState(
-    localStorage.getItem("workspace") || "personal"
+
+  // Lazy initializer — avoids reading localStorage on every render pass
+  const [workspace, setWorkspace] = useState<string>(
+    () => localStorage.getItem("workspace") || "personal"
   );
 
   // ─── Load ─────────────────────────────────────────────────────────────────────
 
-  const loadTasks = useCallback(async () => {
+  const reloadTasks = useCallback(async () => {
     if (!userEmail) return;
-    await initDB();
-    const data = await loadLocalTasks(userEmail, workspace);
-    setTasks(data);
+    const fresh = await loadLocalTasks(userEmail, workspace);
+    setTasks(fresh);
   }, [userEmail, workspace]);
 
+  // Single consolidated effect — prevents double loadLocalTasks call on mount
   useEffect(() => {
-    loadTasks();
-  }, [loadTasks]);
+    if (!userEmail) return;
+
+    const init = async () => {
+      await initDB();
+
+      if (token) {
+        await fetchFromServer(userEmail, workspace, token);
+      }
+
+      await reloadTasks();
+    };
+
+    init();
+  }, [token, userEmail, workspace]);
 
   // Sync when network comes back online
   useEffect(() => {
@@ -56,70 +70,65 @@ export function useTasksEngine() {
     };
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
-  }, [token]);
-
-  // Initial server sync on mount / workspace change
-  useEffect(() => {
-    if (!token || !userEmail) return;
-    const sync = async () => {
-      await fetchFromServer(userEmail, workspace, token);
-      await loadTasks();
-    };
-    sync();
-  }, [token, userEmail, workspace]);
-
-  const reloadTasks = useCallback(async () => {
-    if (!userEmail) return;
-    const fresh = await loadLocalTasks(userEmail, workspace);
-    setTasks(fresh);
-  }, [userEmail, workspace]);
+  }, [token, reloadTasks]);
 
   // ─── Create ───────────────────────────────────────────────────────────────────
 
   async function createTask(
-    text: string,
-    image?: string | null,
-    sectionId?: string | null  // which kanban column this task belongs to
-  ) {
-    if (!userEmail) throw new Error("User not authenticated");
+  text: string,
+  imageFile?: File | null,
+  sectionId?: string | null
+) {
+  if (!userEmail) throw new Error("User not authenticated");
 
-    const task: Task = {
-      id: crypto.randomUUID(),
-      text,
-      completed: false,
-      archived: false,
-      deleted: false,
-      image: image || null,
-      sectionId: sectionId ?? null,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      userEmail,
-      workspaceType: workspace,
-      syncStatus: "pending",
-    };
+  const task: Task = {
+    id: crypto.randomUUID(),
+    text,
+    completed: false,
+    archived: false,
+    deleted: false,
+    deletedAt: null,
+    image: null,
+    sectionId: sectionId ?? null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    userEmail,
+    workspaceType: workspace,
+    syncStatus: "pending",
+    version: 1,
+  };
 
-    await saveLocalTask(task);
+  // Pehle IDB + UI update
+  await saveLocalTask(task);
+  setTasks((prev) => [...prev, task]);
 
+  if (!token) {
+    // Offline — queue mein daalo
     const jobId = crypto.randomUUID();
     await queueCreate(task, userEmail, workspace, jobId);
-
-    setTasks((prev) => [...prev, task]);
-
-    if (!token) return;
-
-    try {
-      await apiCreateTask(task, token);
-      await removeQueueJob(jobId);
-      await saveLocalTask({ ...task, syncStatus: "synced" });
-      // Update local state to reflect synced status
-      setTasks((prev) =>
-        prev.map((t) => (t.id === task.id ? { ...t, syncStatus: "synced" } : t))
-      );
-    } catch {
-      // Offline — will be retried by syncQueue
-    }
+    return;
   }
 
+  // Online — seedha API call, queue mat karo abhi
+  try {
+    const result = await apiCreateTask(task, token, imageFile);
+
+    const syncedTask: Task = {
+      ...task,
+      syncStatus: "synced",
+      image: result?.task?.imageUrl ?? result?.task?.image ?? null,
+    };
+
+    await saveLocalTask(syncedTask);
+    setTasks((prev) =>
+      prev.map((t) => (t.id === task.id ? syncedTask : t))
+    );
+  } catch {
+    // Failed — ab queue mein daalo retry ke liye
+    const jobId = crypto.randomUUID();
+    await queueCreate(task, userEmail, workspace, jobId);
+  }
+}
   // ─── Toggle Complete ──────────────────────────────────────────────────────────
 
   async function toggleComplete(id: string) {
@@ -133,19 +142,27 @@ export function useTasksEngine() {
       completed: !task.completed,
       updatedAt: Date.now(),
       syncStatus: "pending",
+      version: (task.version ?? 1) + 1,
     };
 
     await saveLocalTask(updated);
 
     const jobId = crypto.randomUUID();
-    await queueUpdate(jobId, id, userEmail, { completed: updated.completed });
+    await queueUpdate(jobId, id, userEmail, {
+      completed: updated.completed,
+      version: updated.version,
+    });
 
     setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
 
     if (!token) return;
 
     try {
-      await apiUpdateTask(id, { completed: updated.completed }, token);
+      await apiUpdateTask(
+        id,
+        { completed: updated.completed, version: updated.version },
+        token
+      );
       await saveLocalTask({ ...updated, syncStatus: "synced" });
       await removeQueueJob(jobId);
       setTasks((prev) =>
@@ -162,7 +179,10 @@ export function useTasksEngine() {
     if (!userEmail) return;
 
     await deleteLocalTask(id);
-    await queueDelete(id, userEmail, workspace);
+
+    // Capture jobId so we can clean it up after a successful API call,
+    // preventing a spurious 404 retry from syncQueue
+    const jobId = await queueDelete(id, userEmail, workspace);
 
     setTasks((prev) => prev.filter((t) => t.id !== id));
 
@@ -170,6 +190,7 @@ export function useTasksEngine() {
 
     try {
       await apiDeleteTask(id, token);
+      await removeQueueJob(jobId);
     } catch {
       // Offline — queued for retry
     }
@@ -189,6 +210,7 @@ export function useTasksEngine() {
       image: newImage !== undefined ? newImage : task.image,
       updatedAt: Date.now(),
       syncStatus: "pending",
+      version: (task.version ?? 1) + 1,
     };
 
     await saveLocalTask(updated);
@@ -197,6 +219,7 @@ export function useTasksEngine() {
     await queueUpdate(jobId, id, userEmail, {
       text: updated.text,
       image: updated.image,
+      version: updated.version,
     });
 
     setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
@@ -204,7 +227,11 @@ export function useTasksEngine() {
     if (!token) return;
 
     try {
-      await apiUpdateTask(id, { text: updated.text, image: updated.image }, token);
+      await apiUpdateTask(
+        id,
+        { text: updated.text, image: updated.image, version: updated.version },
+        token
+      );
       await saveLocalTask({ ...updated, syncStatus: "synced" });
       await removeQueueJob(jobId);
       setTasks((prev) =>
@@ -216,7 +243,6 @@ export function useTasksEngine() {
   }
 
   // ─── Move to Section ──────────────────────────────────────────────────────────
-  // Called by KanbanBoard when a task is dragged between columns
 
   async function moveTaskToSection(id: string, sectionId: string | null) {
     if (!userEmail) return;
@@ -229,32 +255,31 @@ export function useTasksEngine() {
       sectionId,
       updatedAt: Date.now(),
       syncStatus: "pending",
+      version: (task.version ?? 1) + 1,
     };
 
     await saveLocalTask(updated);
 
     const jobId = crypto.randomUUID();
-    await queueUpdate(jobId, id, userEmail, { sectionId });
+    await queueUpdate(jobId, id, userEmail, {
+      sectionId,
+      version: updated.version,
+    });
 
     setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
 
     if (!token) return;
 
     try {
-      await apiUpdateTask(id, { sectionId }, token);
+      await apiUpdateTask(id, { sectionId, version: updated.version }, token);
       await saveLocalTask({ ...updated, syncStatus: "synced" });
       await removeQueueJob(jobId);
       setTasks((prev) =>
         prev.map((t) => (t.id === id ? { ...t, syncStatus: "synced" } : t))
       );
-    } catch (error) {
-        const isOffline = !navigator.onLine;
-        if (!isOffline) {
-          console.error("Server error during task create:", error);
-        }
-        // Either way, task is safe in IDB with syncStatus: "pending"
-        // syncQueue will handle the retry
-      }
+    } catch {
+      // Offline — queued for retry
+    }
   }
 
   return {
@@ -265,8 +290,7 @@ export function useTasksEngine() {
     toggleComplete,
     deleteTask,
     editTask,
-    moveTaskToSection, 
-    loadTasks,
+    moveTaskToSection,
     reloadTasks,
   };
 }

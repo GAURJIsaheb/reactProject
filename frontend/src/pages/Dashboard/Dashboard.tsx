@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useAuthStore } from "@/zustand/authStore";
 import { useTasksEngine } from "@/hooks/useTasksEngine";
 import { useSectionsEngine } from "@/hooks/useSectionsEngine";
-import { useTheme } from "@/components/toggleTheme/theme";
+import { useTheme } from "@/shared/components/toggleTheme/theme";
 
 import HeaderSection from "./components/HeaderSection";
 import StatsBar from "./components/StatsBar";
@@ -12,8 +12,8 @@ import KanbanBoard from "./kanban/KanbanBoard";
 import EmptyBoardState from "./components/EmptyBoardState";
 import KanbanSkeleton from "./components/KanbanSkeleton";
 
-import ViewTaskDialog from "@/components/tasks/viewTaskDialog";
-import EditTaskDialog from "@/components/tasks/editTaskDialog";
+import ViewTaskDialog from "@/shared/components/tasks/viewTaskDialog";
+import EditTaskDialog from "@/shared/components/tasks/editTaskDialog";
 
 import { useDashboardState } from "./hooks/useDashboardState";
 import { useDashboardDerived } from "./hooks/useDashboardDerived";

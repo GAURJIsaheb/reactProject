@@ -1,10 +1,10 @@
 import express from "express";
 import bcrypt from "bcrypt";
-import passport from "./passport/passport.js";
+import passport from "./passport.js";
 import { signToken } from "./jwt.js";
 
-import { User }      from './models/User.model.js';
-import { Workspace } from './models/Workspace.model.js';
+import { User }      from '../models/User.model.js';
+import { Workspace } from '../models/Workspace.model.js';
 
 
 const router = express.Router();

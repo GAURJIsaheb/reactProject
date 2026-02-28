@@ -1,10 +1,10 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { DragStartEvent, DragOverEvent, DragEndEvent } from "@dnd-kit/core";
-import type { Task } from "@/types/task";
-import type { Section } from "@/types/section";
+import type { Task } from "@/shared/types/task";
+import type { Section } from "@/shared/types/section";
 
-import { updateTaskSectionInIDB, upsertQueue } from "@/lib/idb";
+import { updateTaskSectionInIDB, upsertQueue } from "@/infrastructure/lib/idb";
 import { authHeaders } from "@/api/authApi";
 import { v4 as uuidv4 } from "uuid";
 

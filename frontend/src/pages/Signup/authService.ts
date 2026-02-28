@@ -1,5 +1,5 @@
 import { signupUser } from "@/api/authApi";
-import { saveUser } from "@/lib/idb";
+import { saveUser } from "@/infrastructure/lib/idb";
 import { useAuthStore } from "@/zustand/authStore";
 
 export async function signupFlow(

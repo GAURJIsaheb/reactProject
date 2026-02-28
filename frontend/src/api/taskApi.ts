@@ -1,7 +1,22 @@
 import { authHeaders } from "@/api/authApi";
-import { addTask } from "@/lib/idb";
+import { addTask } from "@/infrastructure/lib/idb";
 
 const API_BASE = "http://localhost:4000";
+
+// For routes that may have an image — use FormData
+function buildFormData(data: Record<string, any>, imageFile?: File | null): FormData {
+  const fd = new FormData();
+  Object.entries(data).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) fd.append(k, String(v));
+  });
+  if (imageFile) fd.append("image", imageFile);
+  return fd;
+}
+
+// Auth headers without Content-Type (browser sets it with boundary for FormData)
+function authHeadersNoContentType(token: string) {
+  return { Authorization: `Bearer ${token}` };
+}
 
 export async function fetchFromServer(
   userEmail: string,
@@ -14,7 +29,6 @@ export async function fetchFromServer(
     const res = await fetch(`${API_BASE}/tasks?workspaceType=${workspace}`, {
       headers: authHeaders(token),
     });
-
     if (!res.ok) throw new Error("fetch failed");
 
     const serverTasks = await res.json();
@@ -24,11 +38,11 @@ export async function fetchFromServer(
       await addTask({
         id:            t.taskId,
         text:          t.text,
-        image:         t.image ?? null,
+        image:         t.imageUrl ?? t.image ?? null,  // store signed URL locally
         completed:     t.completed,
         archived:      t.archived,
         deleted:       t.deleted,
-        deletedAt:     t.deletedAt ?? null,   
+        deletedAt:     t.deletedAt ?? null,
         sectionId:     t.sectionId ?? null,
         createdAt:     t.createdAt,
         updatedAt:     t.updatedAt,
@@ -42,30 +56,45 @@ export async function fetchFromServer(
   }
 }
 
-export async function apiCreateTask(task: any, token: string) {
+export async function apiCreateTask(task: any, token: string, imageFile?: File | null) {
+  const fd = buildFormData({
+    id:            task.id,
+    text:          task.text,
+    workspaceType: task.workspaceType,
+    ...(task.sectionId ? { sectionId: task.sectionId } : {}),  // ← empty string nahi
+  }, imageFile);
+
   const res = await fetch(`${API_BASE}/tasks`, {
     method:  "POST",
-    headers: authHeaders(token),
-    body: JSON.stringify({
-      id:            task.id,
-      text:          task.text,
-      image:         task.image ?? null,
-      workspaceType: task.workspaceType,
-      sectionId:     task.sectionId ?? null,
-    }),
+    headers: authHeadersNoContentType(token),
+    body:    fd,
   });
 
   if (!res.ok) throw new Error("create failed");
+  return res.json();
 }
 
-export async function apiUpdateTask(id: string, payload: any, token: string) {
+
+export async function apiUpdateTask(
+  id: string,
+  payload: any,
+  token: string,
+  imageFile?: File | null,
+  removeImage?: boolean
+) {
+  const fd = buildFormData(
+    { ...payload, ...(removeImage ? { removeImage: "true" } : {}) },
+    imageFile
+  );
+
   const res = await fetch(`${API_BASE}/tasks/${id}`, {
     method:  "PUT",
-    headers: authHeaders(token),
-    body:    JSON.stringify(payload),
+    headers: authHeadersNoContentType(token),
+    body:    fd,
   });
 
   if (!res.ok) throw new Error("update failed");
+  return res.json();
 }
 
 export async function apiDeleteTask(id: string, token: string) {
@@ -76,3 +105,4 @@ export async function apiDeleteTask(id: string, token: string) {
 
   if (!res.ok) throw new Error("delete failed");
 }
+

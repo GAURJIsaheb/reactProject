@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import type { Task } from "@/types/task";
-import type { Section } from "@/types/section";
+import type { Task } from "@/shared/types/task";
+import type { Section } from "@/shared/types/section";
 
 export function useDashboardDerived(
   tasks: Task[],

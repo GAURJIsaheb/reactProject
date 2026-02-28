@@ -1,5 +1,5 @@
 //a middleware/wrapper used for protected routes,,,it is using passport.js in it
-import passport from "../passport/passport.js"; 
+import passport from "../auth/passport.js"; 
 
 export function requireAuth(req, res, next) {
   passport.authenticate("jwt", { session: false }, (err, user) => {

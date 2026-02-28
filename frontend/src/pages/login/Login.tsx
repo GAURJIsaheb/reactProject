@@ -3,7 +3,7 @@ import { loginUser } from "@/api/authApi";
 import { useAuthStore } from "@/zustand/authStore";
 import { Eye, EyeOff, Anchor } from "lucide-react";
 import { Link } from "react-router-dom";
-import { saveUser, clearAllUserData } from "@/lib/idb";
+import { saveUser, clearAllUserData } from "@/infrastructure/lib/idb";
 
 export default function Login() {
   const { token, setAuth } = useAuthStore();

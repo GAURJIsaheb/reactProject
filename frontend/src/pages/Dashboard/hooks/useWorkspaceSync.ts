@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import { processQueue } from "@/queue/syncQueue";
-import { pullFromServer, fetchWorkspaceId } from "@/sync/sync";
+import { processQueue } from "@/infrastructure/queue/syncQueue";
+import { pullFromServer, fetchWorkspaceId } from "@/infrastructure/mongoSync/sync";
 
 export function useWorkspaceSync(
   workspace: string,

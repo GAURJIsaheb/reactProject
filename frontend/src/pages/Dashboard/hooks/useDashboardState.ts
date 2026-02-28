@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import type { Task } from "@/types/task";
+import type { Task } from "@/shared/types/task";
 
 export function useDashboardState() {
   const [loading, setLoading] = useState(true);

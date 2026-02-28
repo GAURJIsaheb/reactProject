@@ -11,7 +11,7 @@ import {
   Lock,
   Unlock,
 } from "lucide-react";
-import type { Task } from "@/types/task";
+import type { Task } from "@/shared/types/task";
 import { useArchiveEngine } from "./archiveEngine";
 
 interface ArchiveProps {

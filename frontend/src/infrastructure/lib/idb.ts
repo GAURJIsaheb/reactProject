@@ -1,7 +1,7 @@
 import { openDB } from "idb";
-import type { Task } from "@/types/task";
-import type { QueueJob } from "@/types/queue";
-import type { Section } from "@/types/section";
+import type { Task } from "@/shared/types/task";
+import type { QueueJob } from "@/shared/types/queue";
+import type { Section } from "@/shared/types/section";
 
 const DB_NAME = "MyTodoApp";
 const DB_VERSION = 5;

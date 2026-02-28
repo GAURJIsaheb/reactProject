@@ -4,8 +4,8 @@ import {
   getAllTasks,
   getTaskById,
   deleteTaskFromIDB
-} from "@/lib/idb";
-import type { Task } from "@/types/task";
+} from "@/infrastructure/lib/idb";
+import type { Task } from "@/shared/types/task";
 
 export async function loadLocalTasks(userEmail: string, workspace: string) {
   return await getAllTasks(userEmail, workspace);

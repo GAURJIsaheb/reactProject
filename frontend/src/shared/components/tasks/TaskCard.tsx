@@ -1,12 +1,9 @@
 import { Pencil, Trash2, Check } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
+import { DropdownMenu,  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import type { Task } from "@/types/task";
+  DropdownMenuTrigger } from "../ui/dropdown-menu";
+import type { Task } from "@/shared/types/task";
 
 // ─── Palettes ─────────────────────────────────────────────────────────────────
 
@@ -211,10 +208,10 @@ export default function TaskCard({
       </div>
 
       {/* ── Image ── */}
-      {task.image && (
+      {(task.imageUrl || task.image) && (
         <div className={`flex justify-center ${isCompleted ? "opacity-60" : ""}`}>
           <img
-            src={task.image}
+            src={task.imageUrl ?? task.image!}
             alt="attachment"
             className="w-[75%] aspect-video object-cover rounded-sm shadow-sm"
           />

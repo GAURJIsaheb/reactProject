@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { clearSyncTimestamps } from "@/sync/sync";
+import { clearSyncTimestamps } from "@/infrastructure/mongoSync/sync";
 
 interface AuthState {
   token: string | null;

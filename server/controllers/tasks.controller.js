@@ -1,29 +1,85 @@
 import { Task }      from '../models/Task.model.js';
 import { Workspace } from '../models/Workspace.model.js';
 import { asyncHandler } from '../TryCatch/async.js';
+import {
+  uploadImageToS3,
+  deleteImageFromS3,
+  resolveImageUrl,
+} from '../s3/s3Service.js';
 
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+// Attach signed URLs to an array of lean task objects
+async function attachSignedUrls(tasks) {
+  return Promise.all(tasks.map(t => resolveImageUrl(t, Task)));
+}
+
+// ─── Create ───────────────────────────────────────────────────────────────────
 export const createTask = asyncHandler(async (req, res) => {
-  const { id, text, image, workspaceType, sectionId } = req.body;
+  const { id, text, workspaceType, sectionId } = req.body;
   const { userId } = req.user;
 
   const workspace = await Workspace.findOne({ owner: userId, type: workspaceType ?? 'personal' }).lean();
   if (!workspace) return res.status(404).json({ error: 'workspace not found' });
 
-  const existing = await Task.exists({ taskId: id });
-  if (existing) return res.json({ status: 'ok' });
+  const existing = await Task.findOne({ taskId: id }).lean();
+  
+  // Agar exist karta hai BUT image null hai aur ab file aayi hai — UPDATE karo
+  if (existing) {
+    if (req.file && !existing.image) {
+      console.log('🔄 Task exists but no image — updating with image');
+      let imageKey = null;
+      try {
+        imageKey = await uploadImageToS3(req.file.buffer, req.file.mimetype, userId);
+        console.log('✅ S3 upload success, key:', imageKey);
+      } catch(err) {
+        console.error('❌ S3 upload failed:', err);
+        return res.status(500).json({ error: 'S3 upload failed' });
+      }
+
+      const updated = await Task.findOneAndUpdate(
+        { taskId: id },
+        { image: imageKey, updatedAt: Date.now() },
+        { new: true }
+      ).lean();
+
+      const resolved = await resolveImageUrl(updated, Task);
+      return res.json({ status: 'ok', task: resolved });
+    }
+
+    // Task + image exist — skip
+    return res.json({ status: 'ok' });
+  }
+
+  // New task — normal flow
+  let imageKey = null;
+  if (req.file) {
+    try {
+      imageKey = await uploadImageToS3(req.file.buffer, req.file.mimetype, userId);
+      console.log('✅ S3 upload success, key:', imageKey);
+    } catch(err) {
+      console.error('❌ S3 upload failed:', err);
+      return res.status(500).json({ error: 'S3 upload failed' });
+    }
+  }
 
   const task = await Task.create({
     taskId:        id,
     workspaceId:   workspace.workspaceId,
     sectionId:     sectionId ?? null,
     text,
-    image:         image || null,
+    image:         imageKey,
     createdBy:     userId,
     workspaceType: workspaceType ?? 'personal',
   });
 
-  res.json({ status: 'ok', task });
+  const taskObj  = task.toObject();
+  const resolved = await resolveImageUrl(taskObj, Task);
+
+  res.json({ status: 'ok', task: resolved });
 });
+
+// ─── Bulk Create ──────────────────────────────────────────────────────────────
 
 export const bulkCreateTasks = asyncHandler(async (req, res) => {
   const { tasks } = req.body;
@@ -43,7 +99,7 @@ export const bulkCreateTasks = asyncHandler(async (req, res) => {
     workspaceId:   workspaceMap[t.workspaceType ?? 'personal'],
     sectionId:     t.sectionId ?? null,
     text:          t.text,
-    image:         t.image || null,
+    image:         t.image || null,   // bulk create accepts S3 keys only (no upload here)
     completed:     t.completed  ?? false,
     archived:      t.archived   ?? false,
     deleted:       t.deleted    ?? false,
@@ -61,6 +117,8 @@ export const bulkCreateTasks = asyncHandler(async (req, res) => {
   res.json({ ok: true, inserted: docs.length });
 });
 
+// ─── Get All ──────────────────────────────────────────────────────────────────
+
 export const getAllTasks = asyncHandler(async (req, res) => {
   const { workspaceType } = req.query;
   const { userId } = req.user;
@@ -68,28 +126,55 @@ export const getAllTasks = asyncHandler(async (req, res) => {
   const ws = await Workspace.findOne({ owner: userId, type: workspaceType ?? 'personal' }).lean();
   if (!ws) return res.json([]);
 
-  const tasks = await Task.find({ workspaceId: ws.workspaceId, deleted: false }).lean();
-  res.json(tasks);
+  const tasks        = await Task.find({ workspaceId: ws.workspaceId, deleted: false }).lean();
+  const tasksWithUrl = await attachSignedUrls(tasks);
+
+  res.json(tasksWithUrl);
 });
+
+// ─── Update ───────────────────────────────────────────────────────────────────
 
 export const updateTask = asyncHandler(async (req, res) => {
   const { id: taskId } = req.params;
-  const { text, completed, archived, image, sectionId } = req.body;
 
   const task = await Task.findOne({ taskId });
   if (!task) return res.status(404).json({ error: 'Task not found' });
 
-  if (text       !== undefined) task.text       = text;
-  if (image      !== undefined) task.image      = image;
-  if (completed  !== undefined) task.completed  = completed;
-  if (archived   !== undefined) task.archived   = archived;
-  if (sectionId  !== undefined) task.sectionId  = sectionId;
+  const { text, completed, archived, sectionId, removeImage } = req.body;
+
+  if (text      !== undefined) task.text      = text;
+  if (completed !== undefined) task.completed = completed;
+  if (archived  !== undefined) task.archived  = archived;
+  if (sectionId !== undefined) task.sectionId = sectionId;
+
+  // New image uploaded
+  if (req.file) {
+    if (task.image) await deleteImageFromS3(task.image);
+    task.image         = await uploadImageToS3(req.file.buffer, req.file.mimetype, task.createdBy);
+    task.imageUrl      = null;
+    task.imageUrlExpiry= null;
+  }
+
+  // Frontend asked to remove image
+  if (removeImage === 'true' || removeImage === true) {
+    if (task.image) await deleteImageFromS3(task.image);
+    task.image         = null;
+    task.imageUrl      = null;
+    task.imageUrlExpiry= null;
+  }
+
   task.updatedAt = Date.now();
   task.version  += 1;
 
   await task.save();
-  res.json({ status: 'ok' });
+
+  const taskObj  = task.toObject();
+  const resolved = await resolveImageUrl(taskObj, Task);
+
+  res.json({ status: 'ok', task: resolved });
 });
+
+// ─── Bulk Update ──────────────────────────────────────────────────────────────
 
 export const bulkUpdateTasks = asyncHandler(async (req, res) => {
   const { updates } = req.body;
@@ -106,7 +191,8 @@ export const bulkUpdateTasks = asyncHandler(async (req, res) => {
   res.json({ ok: true, modified: result.modifiedCount });
 });
 
-// ─── Soft delete — stamps deletedAt so the cron can hard-delete after 30 days ─
+// ─── Delete ───────────────────────────────────────────────────────────────────
+
 export const deleteTask = asyncHandler(async (req, res) => {
   await Task.updateOne(
     { taskId: req.params.id },
@@ -119,7 +205,7 @@ export const bulkDeleteTasks = asyncHandler(async (req, res) => {
   const { taskIds } = req.body;
   if (!taskIds?.length) return res.json({ ok: true });
 
-  const now = Date.now();
+  const now    = Date.now();
   const result = await Task.updateMany(
     { taskId: { $in: taskIds } },
     { $set: { deleted: true, deletedAt: now, updatedAt: now } }
@@ -133,11 +219,7 @@ export const getWorkspaceId = asyncHandler(async (req, res) => {
   const { workspaceType } = req.query;
   const { userId } = req.user;
 
-  const ws = await Workspace.findOne({
-    owner: userId,
-    type:  workspaceType ?? 'personal',
-  }).lean();
-
+  const ws = await Workspace.findOne({ owner: userId, type: workspaceType ?? 'personal' }).lean();
   if (!ws) return res.status(404).json({ error: 'workspace not found' });
 
   res.json({ workspaceId: ws.workspaceId });
@@ -147,18 +229,10 @@ export const syncTasks = asyncHandler(async (req, res) => {
   const { lastSyncedAt, workspaceId } = req.query;
   const since = lastSyncedAt ? Number(lastSyncedAt) : 0;
 
-  const tasks = await Task.find({
-    workspaceId,
-    updatedAt: { $gt: since },
-  }).lean();
+  const tasks        = await Task.find({ workspaceId, updatedAt: { $gt: since } }).lean();
+  const tasksWithUrl = await attachSignedUrls(tasks);
 
-  const mapped = tasks.map((t) => ({
-    ...t,
-    id: t.taskId,
-  }));
+  const mapped = tasksWithUrl.map(t => ({ ...t, id: t.taskId }));
 
-  res.json({
-    tasks: mapped,
-    syncedAt: Date.now(),
-  });
+  res.json({ tasks: mapped, syncedAt: Date.now() });
 });

@@ -3,7 +3,8 @@ import { Eye, EyeOff, Anchor,Check ,X} from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { signupUser } from "@/api/authApi";
 import { useAuthStore } from "@/zustand/authStore";
-import { saveUser } from "@/lib/idb";
+import { saveUser } from "@/infrastructure/lib/idb";
+import { validateSignup } from "./validateSignup";
 
 interface PasswordRule {
   label: string;
@@ -70,20 +71,13 @@ export default function Signup() {
     e.preventDefault();
     setError("");
 
-    if (!username.trim() || !email.trim() || !password || !confirmPassword) {
-      setError("All fields required");
-      return;
-    }
+      const validationError = validateSignup(username, email, password, confirmPassword, strength);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
 
-    if (strength < 3) {
-      setError("Password too weak");
-      return;
-    }
 
-    if (password !== confirmPassword) {
-      setError("Passwords don't match");
-      return;
-    }
 
     try {
       setLoading(true);

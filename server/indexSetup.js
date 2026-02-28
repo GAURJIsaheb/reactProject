@@ -3,13 +3,12 @@ import cors from 'cors';
 import session from 'express-session';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import authRoutes from './auth.js';
-import passport from "./passport/passport.js"; 
+import authRoutes from './auth/auth.js';
+import passport from './auth/passport.js'
 import { requireAuth } from './middlewares/requireAuth.js';
 
 import adminRoutes from './admin/admin.js';
 
-import sectionsRouter from "./routes/sections.routes.js";
 
 //cron job admin routes
 import cronAdminRouter from './cron/cronAdmin.routes.js';

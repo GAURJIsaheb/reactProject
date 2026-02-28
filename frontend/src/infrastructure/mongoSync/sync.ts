@@ -1,4 +1,4 @@
-import { initDB } from "@/lib/idb";
+import { initDB } from "@/infrastructure/lib/idb";
 import { authHeaders } from "@/api/authApi";
 
 const API_BASE = "http://localhost:4000";

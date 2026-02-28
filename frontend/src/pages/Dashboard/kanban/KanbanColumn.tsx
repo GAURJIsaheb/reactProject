@@ -7,9 +7,9 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Pencil, Trash2, Check, X, Plus, Sparkles } from "lucide-react";
-import type { Section } from "@/types/section";
-import type { Task } from "@/types/task";
-import TaskCard from "@/components/tasks/TaskCard";
+import type { Section } from "@/shared/types/section";
+import type { Task } from "@/shared/types/task";
+import TaskCard from "@/shared/components/tasks/TaskCard";
 
 // ─── Per-column accent palette ────────────────────────────────────────────────
 

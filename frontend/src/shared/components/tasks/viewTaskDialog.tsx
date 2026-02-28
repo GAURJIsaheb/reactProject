@@ -1,10 +1,7 @@
-import {
-  Dialog,
-  DialogContent,
+import { Dialog,  DialogContent,
   DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import type { Task } from "@/types/task";
+  DialogTitle } from "../ui/dialog";
+import type { Task } from "@/shared/types/task";
 import { User, Clock, Wifi, WifiOff } from "lucide-react";
 
 interface Props {
@@ -89,10 +86,10 @@ export default function ViewTaskDialog({ open, onOpenChange, task }: Props) {
           </div>
 
           {/* Image */}
-          {task.image && (
+          {(task.imageUrl || task.image) && (
             <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
               <img
-                src={task.image}
+                src={task.imageUrl ?? task.image!}
                 alt="task attachment"
                 className="w-full max-h-65 object-cover block"
               />

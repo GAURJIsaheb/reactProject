@@ -1,7 +1,7 @@
 import { DragOverlay } from "@dnd-kit/core";
-import TaskCard from "@/components/tasks/TaskCard";
-import type { Task } from "@/types/task";
-import type { Section } from "@/types/section";
+import TaskCard from "@/shared/components/tasks/TaskCard";
+import type { Task } from "@/shared/types/task";
+import type { Section } from "@/shared/types/section";
 
 export default function KanbanDragOverlay({
   activeId,

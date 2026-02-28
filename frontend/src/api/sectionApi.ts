@@ -1,4 +1,4 @@
-import type { Section } from "@/types/section";
+import type { Section } from "@/shared/types/section";
 
 const BASE = "http://localhost:4000";
 

@@ -8,8 +8,8 @@ import {
 import { SortableContext, horizontalListSortingStrategy } from "@dnd-kit/sortable";
 import { useCallback, useState, useEffect } from "react";
 
-import type { Section } from "@/types/section";
-import type { Task } from "@/types/task";
+import type { Section } from "@/shared/types/section";
+import type { Task } from "@/shared/types/task";
 
 import { SortableColumn } from "./KanbanColumn";
 import { useAuthStore } from "@/zustand/authStore";

@@ -1,12 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useAuthStore } from "@/zustand/authStore";
-import type { Section } from "@/types/section";
+import type { Section } from "@/shared/types/section";
 import {
   getAllSections,
   upsertSection,
   deleteSectionFromIDB,
-} from "@/lib/idb";
+} from "@/infrastructure/lib/idb";
 import {
   fetchSections,
   createSectionApi,
