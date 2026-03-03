@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { forgotPassword, resetPassword } from '../controllers/auth.controller.js';
+import { asyncHandler } from '../tryCatch/async.js';
+
+const router = Router();
+
+router.post('/forgot', asyncHandler(forgotPassword));    // POST /password/forgot
+router.post('/reset',  asyncHandler(resetPassword));     // POST /password/reset
+
+export default router;

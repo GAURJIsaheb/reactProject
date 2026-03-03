@@ -1,5 +1,5 @@
 import { getQueue, removeFromQueue, addTask, getTaskById, updateQueue } from "@/infrastructure/lib/idb";
-import { authHeaders } from "@/api/authApi";
+import { authHeaders } from "@/services/auth.service";
 
 const API_BASE = "http://localhost:4000";
 const MAX_RETRY = 5;

@@ -3,10 +3,11 @@ import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 
 import { addTask, upsertQueue } from "@/infrastructure/lib/idb";
-import { apiUpdateTask } from "@/api/taskApi";
+import { apiUpdateTask } from "@/services/task.service";
 
 import type { Task } from "@/shared/types/task";
-
+import taskAddSound from "@/assests/taskadd.wav";
+import taskDeleteSound from "@/assests/deleteTask.wav";
 type Props = {
   input: string;
   setInput: (v: string) => void;
@@ -32,6 +33,26 @@ type Props = {
 
   taskInputRef: React.RefObject<HTMLInputElement | null>;
 };
+
+
+
+function playSuccessSound() {
+  try {
+    const audio = new Audio(taskAddSound);
+    audio.play();
+  } catch {
+    // Audio not available — silently skip
+  }
+}
+
+function deleteTaskSound() {
+  try {
+    const audio = new Audio(taskDeleteSound);
+    audio.play();
+  } catch {
+    // Audio not available — silently skip
+  }
+}
 
 export function useTaskActions({
   input,
@@ -69,6 +90,8 @@ export function useTaskActions({
 
     await createTask(trimmed, fileToUpload, targetSectionId);
 
+    playSuccessSound();
+
     toast.success("✨ Task added!", {
       description: `"${trimmed}"`,
       duration: 2500,
@@ -81,6 +104,8 @@ export function useTaskActions({
   const handleDelete = useCallback((id: string) => {
     const task = tasks.find((t) => t.id === id);
     deleteTask(id);
+
+    deleteTaskSound();
 
     toast.success("🧹 Task deleted", {
       description: task ? `"${task.text}"` : "Task removed",

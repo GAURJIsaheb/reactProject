@@ -1,16 +1,14 @@
 import { Section } from "../models/Section.model.js";
 import { Task } from "../models/Task.model.js";
 
-/**
- * GET /sections/sync
- */
+/* GET /sections/sync*/
 export async function syncSections(req, res) {
   const { workspaceType, lastSyncedAt } = req.query;
   const { userId } = req.user;
 
   const since = lastSyncedAt ? Number(lastSyncedAt) : 0;
 
-  const sections = await Section.find({
+  const sections = await Section.find({//using this indexing:sectionSchema.index({ owner: 1, workspaceType: 1, order: 1 });
     owner: userId,
     workspaceType: workspaceType ?? "personal",
     updatedAt: { $gt: since },
@@ -30,9 +28,7 @@ export async function syncSections(req, res) {
   });
 }
 
-/**
- * GET /sections
- */
+/* GET /sections*/
 export async function getSections(req, res) {
   const { workspaceType } = req.query;
   const { userId } = req.user;
@@ -47,9 +43,7 @@ export async function getSections(req, res) {
   return res.json(sections);
 }
 
-/**
- * POST /sections
- */
+/*POST /sections */
 export async function createSection(req, res) {
   const { id, title, workspaceType, order } = req.body;
   const { userId } = req.user;
@@ -69,9 +63,7 @@ export async function createSection(req, res) {
   return res.json({ ok: true, section });
 }
 
-/**
- * PATCH /sections/:id
- */
+/* PATCH /sections/:id*/
 export async function updateSection(req, res) {
   const { id } = req.params;
   const { title, order } = req.body;
@@ -92,16 +84,14 @@ export async function updateSection(req, res) {
   return res.json({ ok: true });
 }
 
-/**
- * DELETE /sections/:id
- */
+/*DELETE /sections/:id */
 export async function deleteSection(req, res) {
   const { id } = req.params;
   const { userId } = req.user;
 
   await Section.deleteOne({ sectionId: id, owner: userId });
 
-  // Detach tasks from deleted section
+  // Detach tasks also from deleted section
   await Task.updateMany(
     { sectionId: id },
     { $set: { sectionId: null, updatedAt: Date.now() } }

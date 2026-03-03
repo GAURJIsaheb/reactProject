@@ -1,4 +1,4 @@
-import { signupUser } from "@/api/authApi";
+import { signupUser } from "@/services/auth.service";
 import { saveUser } from "@/infrastructure/lib/idb";
 import { useAuthStore } from "@/zustand/authStore";
 

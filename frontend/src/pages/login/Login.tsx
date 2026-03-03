@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { loginUser } from "@/api/authApi";
+import { loginUser } from "@/services/auth.service";
 import { useAuthStore } from "@/zustand/authStore";
 import { Eye, EyeOff, Anchor } from "lucide-react";
 import { Link } from "react-router-dom";
 import { saveUser, clearAllUserData } from "@/infrastructure/lib/idb";
+import { useNavigate } from "react-router-dom";
 
 export default function Login() {
+  const navigate = useNavigate();
   const { token, setAuth } = useAuthStore();
 
   const [email, setEmail] = useState("");
@@ -145,11 +147,14 @@ export default function Login() {
           </div>
 
           {/* Forgot */}
-          <div className="text-right">
-            <a className="font-mono text-[11px] text-gray-500 hover:text-indigo-400" href="#">
-              Forgot password?
-            </a>
-          </div>
+          // Login form ke neeche add karo
+          <button
+            type="button"
+            onClick={() => navigate('/forgot-password')}
+            className="text-[12px] text-indigo-400 hover:text-indigo-300 transition mt-2 underline underline-offset-2"
+          >
+            Forgot password?
+          </button>
 
           {/* Error */}
           {error && (

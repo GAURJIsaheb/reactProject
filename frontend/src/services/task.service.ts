@@ -1,7 +1,7 @@
-import { authHeaders } from "@/api/authApi";
+import { authHeaders } from "@/services/auth.service";
 import { addTask } from "@/infrastructure/lib/idb";
 
-const API_BASE = "http://localhost:4000";
+const API_BASE = `http://${window.location.hostname}:4000`;
 
 // For routes that may have an image — use FormData
 function buildFormData(data: Record<string, any>, imageFile?: File | null): FormData {

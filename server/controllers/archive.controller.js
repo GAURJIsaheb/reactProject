@@ -1,22 +1,21 @@
 import { Archive }   from '../models/Archive.model.js';
 import { Task }      from '../models/Task.model.js';
 import { Workspace } from '../models/Workspace.model.js';
-import { asyncHandler } from '../TryCatch/async.js';
 
-export const bulkArchive = asyncHandler(async (req, res) => {
+export const bulkArchive = async (req, res) => {
   const { tasks } = req.body;
   const { userId } = req.user;
 
-  if (!Array.isArray(tasks) || !tasks.length)
+  if (!Array.isArray(tasks) || !tasks.length)//simple input validation
     return res.status(400).json({ error: 'tasks array required' });
 
 
 const workspace = await Workspace.findOne({
   owner: userId,
   type: tasks[0]?.workspaceType ?? 'personal',
-}).lean();
+}).lean();//return plain js object rather than Mongoose document instance
 
-const docs = tasks.map(t => ({
+const docs = tasks.map(t => ({//preparing archive docs
   _id:              t.id,
   userId,
   workspaceId:      workspace?.workspaceId ?? 'unknown',
@@ -36,24 +35,24 @@ const docs = tasks.map(t => ({
   );
 
   res.json({ ok: true });
-});
+};
 
-export const getArchive = asyncHandler(async (req, res) => {
+export const getArchive = async (req, res) => {
   const { userId } = req.user;
   const tasks = await Archive.find({ userId, restoredAt: null }).lean();
   res.json({ tasks });
-});
+};
 
-export const restoreOne = asyncHandler(async (req, res) => {
+export const restoreOne = async (req, res) => {
   const { id } = req.params;
 
   await Archive.updateOne({ _id: id }, { $set: { restoredAt: Date.now() } });
   await Task.updateOne({ taskId: id }, { $set: { archived: false, updatedAt: Date.now() } });
 
   res.json({ ok: true });
-});
+};
 
-export const restoreAll = asyncHandler(async (req, res) => {
+export const restoreAll = async (req, res) => {
   const { userId } = req.user;
 
   const archived = await Archive.find({ userId, restoredAt: null }).lean();
@@ -70,4 +69,4 @@ export const restoreAll = asyncHandler(async (req, res) => {
   );
 
   res.json({ ok: true });
-});
+};

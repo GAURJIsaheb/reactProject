@@ -23,7 +23,7 @@ import {
   apiUpdateTask,
   apiDeleteTask,
   fetchFromServer,
-} from "../api/taskApi";
+} from "../services/task.service";
 
 export function useTasksEngine() {
   const { userEmail, token } = useAuthStore();

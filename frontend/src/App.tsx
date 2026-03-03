@@ -5,6 +5,8 @@ import Signup from "./pages/Signup/Signup";
 import Dashboard from "./pages/Dashboard/Dashboard";
 import { useAuthStore } from "./zustand/authStore";
 import AdminDashboard from "./Admin/adminDashboard";
+import ResetPassword from "./pages/ResetPassword/ResetPassword";
+import ForgotPassword from "./pages/ForgotPassword/ForgotPassword";
 
 
 
@@ -67,6 +69,9 @@ function App() {
       <Routes>
         <Route path="/login"  element={!token ? <Login />  : <Navigate to={isAdmin ? "/admin" : "/dashboard"} />} />
         <Route path="/signup" element={!token ? <Signup /> : <Navigate to={isAdmin ? "/admin" : "/dashboard"} />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password"  element={<ResetPassword />} />
+
 
         <Route path="/dashboard" element={
           !token   ? <Navigate to="/login" />     :

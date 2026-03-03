@@ -12,7 +12,7 @@ import {
   createSectionApi,
   updateSectionApi,
   deleteSectionApi,
-} from "@/api/sectionApi";
+} from "@/services/section.service";
 
 export function useSectionsEngine(workspaceType: string) {
   const { token, userEmail } = useAuthStore();

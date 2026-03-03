@@ -28,7 +28,7 @@ import {
   apiArchiveTasks,
   apiRestoreTask,
   apiRestoreAllTasks,
-} from "../api/archiveApi";
+} from "../services/archive.service";
 
 export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
   const { userEmail, token } = useAuthStore();

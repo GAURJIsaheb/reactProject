@@ -1,6 +1,6 @@
 import { Task }      from '../models/Task.model.js';
 import { Workspace } from '../models/Workspace.model.js';
-import { asyncHandler } from '../TryCatch/async.js';
+
 import {
   uploadImageToS3,
   deleteImageFromS3,
@@ -15,7 +15,7 @@ async function attachSignedUrls(tasks) {
 }
 
 // ─── Create ───────────────────────────────────────────────────────────────────
-export const createTask = asyncHandler(async (req, res) => {
+export const createTask = async (req, res) => {
   const { id, text, workspaceType, sectionId } = req.body;
   const { userId } = req.user;
 
@@ -24,7 +24,7 @@ export const createTask = asyncHandler(async (req, res) => {
 
   const existing = await Task.findOne({ taskId: id }).lean();
   
-  // Agar exist karta hai BUT image null hai aur ab file aayi hai — UPDATE karo
+  //Task created earlier without image → image arrives later.  — UPDATE 
   if (existing) {
     if (req.file && !existing.image) {
       console.log('🔄 Task exists but no image — updating with image');
@@ -77,11 +77,11 @@ export const createTask = asyncHandler(async (req, res) => {
   const resolved = await resolveImageUrl(taskObj, Task);
 
   res.json({ status: 'ok', task: resolved });
-});
+};
 
 // ─── Bulk Create ──────────────────────────────────────────────────────────────
 
-export const bulkCreateTasks = asyncHandler(async (req, res) => {
+export const bulkCreateTasks =async (req, res) => {
   const { tasks } = req.body;
   if (!tasks?.length) return res.json({ ok: true });
 
@@ -115,11 +115,11 @@ export const bulkCreateTasks = asyncHandler(async (req, res) => {
   });
 
   res.json({ ok: true, inserted: docs.length });
-});
+};
 
 // ─── Get All ──────────────────────────────────────────────────────────────────
 
-export const getAllTasks = asyncHandler(async (req, res) => {
+export const getAllTasks = async (req, res) => {
   const { workspaceType } = req.query;
   const { userId } = req.user;
 
@@ -130,11 +130,11 @@ export const getAllTasks = asyncHandler(async (req, res) => {
   const tasksWithUrl = await attachSignedUrls(tasks);
 
   res.json(tasksWithUrl);
-});
+};
 
 // ─── Update ───────────────────────────────────────────────────────────────────
 
-export const updateTask = asyncHandler(async (req, res) => {
+export const updateTask = async (req, res) => {
   const { id: taskId } = req.params;
 
   const task = await Task.findOne({ taskId });
@@ -172,11 +172,21 @@ export const updateTask = asyncHandler(async (req, res) => {
   const resolved = await resolveImageUrl(taskObj, Task);
 
   res.json({ status: 'ok', task: resolved });
-});
+};
+
+// ─── Delete ───────────────────────────────────────────────────────────────────
+
+export const deleteTask =async (req, res) => {
+  await Task.updateOne(
+    { taskId: req.params.id },
+    { $set: { deleted: true, deletedAt: Date.now(), updatedAt: Date.now() } }
+  );
+  res.json({ status: 'ok' });
+};
 
 // ─── Bulk Update ──────────────────────────────────────────────────────────────
 
-export const bulkUpdateTasks = asyncHandler(async (req, res) => {
+export const bulkUpdateTasks = async (req, res) => {
   const { updates } = req.body;
   if (!updates?.length) return res.json({ ok: true });
 
@@ -189,19 +199,11 @@ export const bulkUpdateTasks = asyncHandler(async (req, res) => {
 
   const result = await Task.bulkWrite(bulkOps, { ordered: false });
   res.json({ ok: true, modified: result.modifiedCount });
-});
+};
 
-// ─── Delete ───────────────────────────────────────────────────────────────────
+// ─── Bulk Delete ───────────────────────────────────────────────────────────────────
 
-export const deleteTask = asyncHandler(async (req, res) => {
-  await Task.updateOne(
-    { taskId: req.params.id },
-    { $set: { deleted: true, deletedAt: Date.now(), updatedAt: Date.now() } }
-  );
-  res.json({ status: 'ok' });
-});
-
-export const bulkDeleteTasks = asyncHandler(async (req, res) => {
+export const bulkDeleteTasks =async (req, res) => {
   const { taskIds } = req.body;
   if (!taskIds?.length) return res.json({ ok: true });
 
@@ -211,11 +213,11 @@ export const bulkDeleteTasks = asyncHandler(async (req, res) => {
     { $set: { deleted: true, deletedAt: now, updatedAt: now } }
   );
   res.json({ ok: true, deleted: result.modifiedCount });
-});
+};
 
 // ─── Sync ─────────────────────────────────────────────────────────────────────
 
-export const getWorkspaceId = asyncHandler(async (req, res) => {
+export const getWorkspaceId = async (req, res) => {
   const { workspaceType } = req.query;
   const { userId } = req.user;
 
@@ -223,9 +225,9 @@ export const getWorkspaceId = asyncHandler(async (req, res) => {
   if (!ws) return res.status(404).json({ error: 'workspace not found' });
 
   res.json({ workspaceId: ws.workspaceId });
-});
+};
 
-export const syncTasks = asyncHandler(async (req, res) => {
+export const syncTasks = async (req, res) => {
   const { lastSyncedAt, workspaceId } = req.query;
   const since = lastSyncedAt ? Number(lastSyncedAt) : 0;
 
@@ -235,4 +237,4 @@ export const syncTasks = asyncHandler(async (req, res) => {
   const mapped = tasksWithUrl.map(t => ({ ...t, id: t.taskId }));
 
   res.json({ tasks: mapped, syncedAt: Date.now() });
-});
+};

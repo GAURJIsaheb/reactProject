@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Eye, EyeOff, Anchor,Check ,X} from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { signupUser } from "@/api/authApi";
+import { signupUser } from "@/services/auth.service";
 import { useAuthStore } from "@/zustand/authStore";
 import { saveUser } from "@/infrastructure/lib/idb";
 import { validateSignup } from "./validateSignup";

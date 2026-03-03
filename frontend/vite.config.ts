@@ -12,7 +12,10 @@ export default defineConfig({
     }),
     tailwindcss(),
   ],
-
+  server: {
+    host: true,   // ← add karo
+    port: 5173,
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

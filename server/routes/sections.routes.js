@@ -1,5 +1,5 @@
 import express from "express";
-import { asyncHandler } from "../TryCatch/async.js";
+import { asyncHandler } from "../tryCatch/async.js";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { syncSections,
   getSections,

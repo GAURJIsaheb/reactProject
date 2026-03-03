@@ -1,5 +1,5 @@
 import express from 'express';
-import { asyncHandler } from '../TryCatch/async.js';
+import { asyncHandler } from '../tryCatch/async.js';
 import { requireAuth } from '../middlewares/requireAuth.js';
 import { Task }    from '../models/Task.model.js';
 import { User }    from '../models/User.model.js';
@@ -35,16 +35,16 @@ router.get('/analytics', requireAuth, requireSuperAdmin, asyncHandler(async (req
 
     // 1. Task status counts
     Task.aggregate([//compound indexing working in schemaL:({ deleted: 1, deletedAt: 1 });
-      { $match: { deleted: false } },//only non-delete tasks
+      { $match: { deleted: false } },
       {
         $group: {
           _id: null,
           total:     { $sum: 1 },
           active:    { $sum: { $cond: [{ $and: [{ $eq: ['$completed', false] }, { $eq: ['$archived', false] }] }, 1, 0] } },
-          completed: { $sum: { $cond: ['$completed', 1, 0] } },//if completed,true shorthand
+          completed: { $sum: { $cond: ['$completed', 1, 0] } },//if completed==true shorthand
           archived:  { $sum: { $cond: ['$archived',  1, 0] } },
           deleted:   { $sum: { $cond: ['$deleted',   1, 0] } },
-          withImage: { $sum: { $cond: [{ $and: ['$image', { $ne: ['$image', null] }] }, 1, 0] } },
+          withImage: { $sum: { $cond: [{ $and: ['$image', { $ne: ['$image', null] }] }, 1, 0] } },//image exist and do not have null value
         }
       }
     ]),
@@ -53,8 +53,8 @@ router.get('/analytics', requireAuth, requireSuperAdmin, asyncHandler(async (req
     Task.aggregate([
       { $match: { deleted: false } },//compund indexing working
       { $group: { _id: '$createdBy', count: { $sum: 1 }, completed: { $sum: { $cond: ['$completed', 1, 0] } } } },
-      { $sort: { count: -1 } },//sort by count decending
-      { $limit: 10 },//after sorting keep only 10 users --- > top 10 users with highest tasks count
+      { $sort: { count: -1 } },
+      { $limit: 10 },
       {
         $lookup: {
           from: 'users',//tasks with users

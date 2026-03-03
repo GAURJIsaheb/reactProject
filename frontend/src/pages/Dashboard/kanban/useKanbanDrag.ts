@@ -5,7 +5,7 @@ import type { Task } from "@/shared/types/task";
 import type { Section } from "@/shared/types/section";
 
 import { updateTaskSectionInIDB, upsertQueue } from "@/infrastructure/lib/idb";
-import { authHeaders } from "@/api/authApi";
+import { authHeaders } from "@/services/auth.service";
 import { v4 as uuidv4 } from "uuid";
 
 export function useKanbanDrag({
@@ -94,13 +94,20 @@ export function useKanbanDrag({
 
     // ── Column reorder ──
     if (dragType === "column") {
-      if (active.id === over.id) return;
+      const activeSectionId = String(active.id);
+      const overType = over.data.current?.type;
+      const targetSectionId =
+        overType === "column"
+          ? String(over.id)
+          : (over.data.current?.sectionId as string | undefined);
+
+      if (!targetSectionId || activeSectionId === targetSectionId) return;
 
       // sectionsRef.current is always the latest localSections from KanbanBoard
       // because we assign it inline on every render (not via useEffect)
       const currentSections = sectionsRef.current;
-      const oldIdx = currentSections.findIndex(s => s.id === active.id);
-      const newIdx = currentSections.findIndex(s => s.id === over.id);
+      const oldIdx = currentSections.findIndex(s => s.id === activeSectionId);
+      const newIdx = currentSections.findIndex(s => s.id === targetSectionId);
 
       if (oldIdx === -1 || newIdx === -1) return;
 

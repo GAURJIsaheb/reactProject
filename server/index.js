@@ -1,16 +1,15 @@
-
 import { createServer } from './indexSetup.js';
 import { registerRoutes } from './routes/index.js';
 import { connectDB } from './mongo/mongo.js';
 import { registerCronJobs } from './cron/cleanupJobs.js';
-
+import { startConsumer } from './sqs/sqsConsumer.js';
 import path from 'path';
 
 const { app, clientPath } = createServer();
 
-registerRoutes(app);
+registerRoutes(app); //register routes
 
-app.get('/', (req, res) => {
+app.get('/{*splat}', (req, res) => {
   res.sendFile(path.join(clientPath, 'index.html'));
 });
 
@@ -21,8 +20,47 @@ app.use((err, req, res, next) => {
 
 async function start() {
   await connectDB();
-  registerCronJobs();   // ← after DB is ready, 
-  app.listen(4000, () => console.log('Server on 4000 + Mongo'));
+  registerCronJobs();
+  startConsumer();//email
+  app.listen(4000, '0.0.0.0', () => console.log('Server on 4000 + Mongo'));
 }
 
 start();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+0.0.0.0 means:
+Accept connections from anywhere that can reach this machine.”
+
+That includes:
+
+Other devices on your WiFi
+
+Docker containers
+ */
