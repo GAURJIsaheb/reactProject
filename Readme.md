@@ -13,7 +13,7 @@ This project follows an **offline-first distributed frontend architecture**.
 
 * React with custom hooks
 * Zustand for global auth state
-* IndexedDB for local storage (primary source of truth)
+* IndexedDB for local storage (local source of truth)
 * Sync queue engine for background server sync
 
 **Backend (Express + MongoDB)**
@@ -53,7 +53,7 @@ This project follows an **offline-first distributed frontend architecture**.
 
 ### Authentication
 
-* JWT based login
+* JWT based login using Passport.js
 * Token stored in localStorage
 * Auth headers attached automatically
 * Protected routes
@@ -73,6 +73,9 @@ This project follows an **offline-first distributed frontend architecture**.
 * Delete task
 * Archive tasks
 * Workspace support (personal/professional)
+* Section wise tasks segregation
+* Section creation and deletion
+  
 
 
 ### Sync Engine
@@ -176,3 +179,4 @@ Full-stack offline-first architecture experiment
 
 Aditya Gaur
 Full-stack offline-first architecture experiment
+
