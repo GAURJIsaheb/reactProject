@@ -10,7 +10,7 @@ import ForgotPassword from "./pages/ForgotPassword/ForgotPassword";
 
 
 
-const API = "http://localhost:4000";
+const API = `http://${window.location.hostname}:4000`; 
 
 function App() {
   const { token, setAuth, logout } = useAuthStore();

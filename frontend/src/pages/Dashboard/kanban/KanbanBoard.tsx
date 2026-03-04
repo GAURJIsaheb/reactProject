@@ -6,7 +6,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { SortableContext, horizontalListSortingStrategy } from "@dnd-kit/sortable";
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useMemo } from "react";
 
 import type { Section } from "@/shared/types/section";
 import type { Task } from "@/shared/types/task";
@@ -34,6 +34,8 @@ interface Props {
   onTaskAdd: (sectionId: string) => void;
 }
 
+const SECTIONS_PER_PAGE = 12;
+
 export default function KanbanBoard(props: Props) {
   const { token, userEmail } = useAuthStore();
 
@@ -46,6 +48,13 @@ export default function KanbanBoard(props: Props) {
   useEffect(() => {
     setLocalSections(props.sections);
   }, [props.sections]);
+
+  const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    const lastPage = Math.max(0, Math.ceil(localSections.length / SECTIONS_PER_PAGE) - 1);
+    if (page > lastPage) setPage(lastPage);
+  }, [localSections.length, page]);
 
   // When the drag hook finishes a column reorder it calls this,
   // which updates local state immediately (no snap-back) and also
@@ -75,11 +84,26 @@ export default function KanbanBoard(props: Props) {
 
   const [justCompleted, setJustCompleted] = useState<Set<string>>(new Set());
 
+  const tasksBySection = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    for (const task of drag.localTasks) {
+      if (task.deleted || !task.sectionId) continue;
+      const bucket = map.get(task.sectionId);
+      if (bucket) bucket.push(task);
+      else map.set(task.sectionId, [task]);
+    }
+    return map;
+  }, [drag.localTasks]);
+
   const getTasksForSection = useCallback(
-    (sectionId: string) =>
-      drag.localTasks.filter((t) => t.sectionId === sectionId && !t.deleted),
-    [drag.localTasks]
+    (sectionId: string) => tasksBySection.get(sectionId) ?? [],
+    [tasksBySection]
   );
+
+  const totalPages = Math.max(1, Math.ceil(localSections.length / SECTIONS_PER_PAGE));
+  const start = page * SECTIONS_PER_PAGE;
+  const end = start + SECTIONS_PER_PAGE;
+  const visibleSections = localSections.slice(start, end);
 
   const handleToggle = (id: string, e?: React.MouseEvent) => {
     const task = drag.localTasks.find((t) => t.id === id);
@@ -105,18 +129,46 @@ export default function KanbanBoard(props: Props) {
       onDragOver={drag.handleDragOver}
       onDragEnd={drag.handleDragEnd}
     >
+      <div className="mb-3 flex items-center justify-between px-1">
+        <p className="text-xs text-muted-foreground">
+          Showing sections {localSections.length === 0 ? 0 : start + 1}-
+          {Math.min(end, localSections.length)} of {localSections.length}
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="rounded-lg border px-3 py-1.5 text-xs disabled:opacity-40"
+          >
+            Prev
+          </button>
+          <span className="text-xs tabular-nums text-muted-foreground">
+            {page + 1}/{totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={page >= totalPages - 1}
+            className="rounded-lg border px-3 py-1.5 text-xs disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
       <div className="kanban-board-scroll flex gap-5 overflow-x-auto pb-6 pt-2 min-h-[60vh]">
         {/* Drive SortableContext from localSections so it reflects live order */}
         <SortableContext
-          items={localSections.map((s) => s.id)}
+          items={visibleSections.map((s) => s.id)}
           strategy={horizontalListSortingStrategy}
         >
-          {localSections.map((section, idx) => (
+          {visibleSections.map((section, idx) => (
             <SortableColumn
               key={section.id}
               section={section}
               tasks={getTasksForSection(section.id)}
-              columnIndex={idx}
+              columnIndex={start + idx}
               onRename={props.onRenameSection}
               onDelete={props.onDeleteSection}
               onTaskDelete={props.onTaskDelete}

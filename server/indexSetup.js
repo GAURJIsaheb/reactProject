@@ -7,8 +7,6 @@ import authRoutes from './auth/auth.js';
 import passport from './auth/passport.js'
 import { requireAuth } from './middlewares/requireAuth.js';
 
-import adminRoutes from './admin/admin.js';
-
 
 //cron job admin routes
 import cronAdminRouter from './cron/cronAdmin.routes.js';
@@ -37,9 +35,6 @@ export function createServer() {
     secret:process.env.SESSION_KEY,
     resave: false,
     saveUninitialized: false,//lazy allocation for sessions.
-    /* If 10,000 users visit your site but only 500 log in:
-    With true → 10,000 sessions stored
-    With false → only 500 sessions stored */
     cookie: { httpOnly: true, sameSite: 'lax', maxAge: 1000 * 60 * 60 * 24 }
   }));
 
@@ -49,7 +44,6 @@ export function createServer() {
   //routes mounting
 
   app.use('/auth', authRoutes);//login,signup
-  app.use('/admin', adminRoutes);
 
 
 

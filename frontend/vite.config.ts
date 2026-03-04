@@ -13,7 +13,7 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
-    host: true,   // ← add karo
+    host: true,   
     port: 5173,
   },
   resolve: {
