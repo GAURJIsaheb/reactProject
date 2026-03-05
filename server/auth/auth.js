@@ -10,7 +10,7 @@ import { Workspace } from '../models/Workspace.model.js';
 const router = express.Router();
 
 
-// SIGNUP
+// SIGNUP--->with Transaction
 router.post("/signup", async (req, res) => {
   const { name, email, password } = req.body;
   if (!email || !name || !password)
@@ -20,13 +20,35 @@ router.post("/signup", async (req, res) => {
   if (existing) return res.status(400).json({ error: "User already exists" });
 
   const hashed = await bcrypt.hash(password, 10);
-  const user = await User.create({ email, name, password: hashed });
-  const userId = user._id.toString();
 
-  await Workspace.insertMany([
-    { workspaceId: crypto.randomUUID(), type: 'personal',     owner: user._id, members: [user._id] },
-    { workspaceId: crypto.randomUUID(), type: 'professional', owner: user._id, members: [user._id] },
-  ]);
+  const session = await User.startSession();//container of transaction
+  let user;
+
+  try {
+    await session.withTransaction(async () => {
+      const createdUsers = await User.create(
+        [{ email, name, password: hashed }],
+        { session }
+      );
+      user = createdUsers[0];
+
+      await Workspace.insertMany(
+        [
+          { workspaceId: crypto.randomUUID(), type: 'personal',     owner: user._id, members: [user._id] },
+          { workspaceId: crypto.randomUUID(), type: 'professional', owner: user._id, members: [user._id] },
+        ],
+        { session }
+      );
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  if (!user) {
+    return res.status(500).json({ error: "Signup failed" });
+  }
+
+  const userId = user._id.toString();
 
   const token = signToken({ email, name, userId });
   res.json({ token, user: { email, name, userId } });

@@ -13,7 +13,7 @@ export const bulkArchive = async (req, res) => {
 const workspace = await Workspace.findOne({
   owner: userId,
   type: tasks[0]?.workspaceType ?? 'personal',
-}).lean();//return plain js object rather than Mongoose document instance
+}).lean();
 
 const docs = tasks.map(t => ({//preparing archive docs
   _id:              t.id,

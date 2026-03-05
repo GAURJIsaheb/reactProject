@@ -1,13 +1,9 @@
 import type { Section } from "@/shared/types/section";
+import { authHeaders } from "@/services/auth.service";
 
 const BASE = "http://localhost:4000";
 
-export function authHeaders(token: string): HeadersInit {
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  };
-}
+
 
 export async function fetchSections(
   token: string,

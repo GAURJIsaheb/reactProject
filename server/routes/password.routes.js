@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { forgotPassword, resetPassword } from '../controllers/auth.controller.js';
+import { forgotPassword, resetPassword } from '../controllers/password.controller.js';
 import { asyncHandler } from '../tryCatch/async.js';
 
 const router = Router();

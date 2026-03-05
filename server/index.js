@@ -22,7 +22,7 @@ async function start() {
   await connectDB();
   registerCronJobs();
   startConsumer();//email
-  app.listen(4000, '0.0.0.0', () => console.log('Server on 4000 + Mongo'));
+  app.listen(4000, () => console.log('Server on 4000 + Mongo'));
 }
 
 start();

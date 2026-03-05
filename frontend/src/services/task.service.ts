@@ -13,7 +13,7 @@ function buildFormData(data: Record<string, any>, imageFile?: File | null): Form
   return fd;
 }
 
-// Auth headers without Content-Type (browser sets it with boundary for FormData)
+// Auth headers without Content-Type (browser sets it with boundary for: FormData is not json)
 function authHeadersNoContentType(token: string) {
   return { Authorization: `Bearer ${token}` };
 }

@@ -1,11 +1,7 @@
+import { authHeaders } from "@/services/auth.service";
 const BASE = "http://localhost:4000";
 
-function authHeaders(token: string): HeadersInit {
-  return {
-    "Content-Type": "application/json",
-    Authorization:  `Bearer ${token}`,
-  };
-}
+
 
 export interface ServerArchivedTask {
   id:               string;
@@ -43,17 +39,17 @@ export async function apiRestoreAllTasks(token: string): Promise<void> {
   const res = await fetch(`${BASE}/archive/restore-all`, {
     method:  "PATCH",
     headers: authHeaders(token),
-    // userEmail nahi chahiye — backend token se userId lete hai
+    
   });
   if (!res.ok) throw new Error("restore-all failed");
 }
 
-// GET /archive  — backend token se userId filter karta hai
+// GET /archive  — 
 export async function apiFetchArchivedTasks(
   token: string
 ): Promise<ServerArchivedTask[]> {
   const res = await fetch(`${BASE}/archive`, {
-    headers: authHeaders(token),  // ← userEmail query param hata diya
+    headers: authHeaders(token), 
   });
   if (!res.ok) return [];
   const data = await res.json();

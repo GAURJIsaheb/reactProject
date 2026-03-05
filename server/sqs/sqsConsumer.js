@@ -5,7 +5,7 @@ import { sendResetEmail } from './mailer.js';
 
 const QUEUE_URL  = process.env.SQS_QUEUE_URL;
 let   isRunning  = false;
-// server/sqs/sqsConsumer.js — processMessage function
+
 async function processMessage(message) {
   const body = JSON.parse(message.Body);
   console.log(`⚙️  Processing: ${body.type} for ${body.email}`);
@@ -19,12 +19,12 @@ async function processMessage(message) {
       });
       console.log(`📧 Email sent successfully to: ${body.email}`);
     } catch (err) {
-      console.error(`❌ Email send failed:`, err.message); // ← exact error 
-      throw err; // ← rethrow ,,to prevent the msg to be deleted
+      console.error(`❌ Email send failed:`, err.message); 
+      throw err; // ← rethrow ,,
     }
   }
 
-  await sqs.send(new DeleteMessageCommand({
+  await sqs.send(new DeleteMessageCommand({//delete the msg
     QueueUrl:      QUEUE_URL,
     ReceiptHandle: message.ReceiptHandle,
   }));
@@ -39,7 +39,7 @@ async function pollQueue() {
     const response = await sqs.send(new ReceiveMessageCommand({
       QueueUrl:            QUEUE_URL,
       MaxNumberOfMessages: 5,      // 5 msgs at a time
-      WaitTimeSeconds:     10,     // long polling — cost efficient
+      WaitTimeSeconds:     10,     
       VisibilityTimeout:   30,     // wait for 30 sec,,if not happen go back to sqs
     }));
 

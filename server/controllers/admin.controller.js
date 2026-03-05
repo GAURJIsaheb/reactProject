@@ -2,7 +2,7 @@ import { Task }    from '../models/Task.model.js';
 import { User }    from '../models/User.model.js';
 import { Archive } from '../models/Archive.model.js';
 
-// ─── GET /admin/analytics ─────────────────────────────────────────────────────
+// ─── GET /admin/analytics ─────────────────────────
 export async function getAnalytics(req, res) {
   const [
     taskStatusCounts,
@@ -34,7 +34,7 @@ export async function getAnalytics(req, res) {
     ]),
 
     // 2. Tasks per user
-    Task.aggregate([
+    Task.aggregate([//materalised counters???
       { $match: { deleted: false } },
       { $group: { _id: '$createdBy', count: { $sum: 1 }, completed: { $sum: { $cond: ['$completed', 1, 0] } } } },
       { $sort: { count: -1 } },
