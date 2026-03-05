@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema({
   provider:  { type: String, enum: ['local', 'google', 'github'], default: 'local' },
   providerId:{ type: String, default: null },
   avatar:    { type: String, default: null },
-  role:      { type: String, enum: ['user', 'admin'], default: 'user' },
+  role:      { type: String, enum: ['user', 'superadmin'], default: 'user' },
   createdAt: { type: Number, default: () => Date.now() },
   updatedAt: { type: Number, default: () => Date.now() },
 }, { versionKey: false });

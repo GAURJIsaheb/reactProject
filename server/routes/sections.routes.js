@@ -1,6 +1,5 @@
 import express from "express";
 import { asyncHandler } from "../tryCatch/async.js";
-import { requireAuth } from "../middlewares/requireAuth.js";
 import { syncSections,
   getSections,
   createSection,
@@ -9,11 +8,11 @@ import { syncSections,
 
 const router = express.Router();
 
-router.get("/sync", requireAuth, asyncHandler(syncSections));
-router.get("/", requireAuth, asyncHandler(getSections));//method:get
-router.post("/", requireAuth, asyncHandler(createSection));//method:post
-router.patch("/:id", requireAuth, asyncHandler(updateSection));
-router.delete("/:id", requireAuth, asyncHandler(deleteSection));
+router.get("/sync",      asyncHandler(syncSections));
+router.get("/",          asyncHandler(getSections));//method:get
+router.post("/",         asyncHandler(createSection));//method:post
+router.patch("/:id",     asyncHandler(updateSection));
+router.delete("/:id",    asyncHandler(deleteSection));
 
 export default router;
 

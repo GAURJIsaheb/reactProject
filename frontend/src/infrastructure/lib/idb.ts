@@ -64,6 +64,35 @@ export const getAllTasks = async (
   );
 };
 
+// Reconcile local synced snapshot with server truth for one workspace.
+// We only prune synced records so pending offline tasks are not lost.
+export async function pruneSyncedTasksMissingOnServer(
+  userEmail: string,
+  workspaceType: string,
+  serverTaskIds: string[]
+): Promise<void> {
+  if (!userEmail) return;
+  const db = await initDB();
+  const allTasks = await db.getAll(STORE_TASKS);
+  const serverIds = new Set(serverTaskIds);
+
+  const stale = allTasks.filter(
+    (t) =>
+      t.userEmail === userEmail &&
+      (t.workspaceType || "personal") === workspaceType &&
+      t.syncStatus === "synced" &&
+      !serverIds.has(t.id)
+  );
+
+  if (stale.length === 0) return;
+
+  const tx = db.transaction(STORE_TASKS, "readwrite");
+  for (const task of stale) {
+    tx.store.delete(task.id);
+  }
+  await tx.done;
+}
+
 export async function getAllArchivedTasks(userEmail: string) {
   if (!userEmail) return [];
   const db = await initDB();

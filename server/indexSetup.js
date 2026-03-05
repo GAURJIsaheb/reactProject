@@ -5,11 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import authRoutes from './auth/auth.js';
 import passport from './auth/passport.js'
-import { requireAuth } from './middlewares/requireAuth.js';
 
-
-//cron job admin routes
-import cronAdminRouter from './cron/cronAdmin.routes.js';
 
 
 
@@ -47,8 +43,7 @@ export function createServer() {
 
 
 
-  //cron job
-  app.use('/admin/crons', requireAuth, cronAdminRouter);
+
   
   return { app,clientPath };
 }

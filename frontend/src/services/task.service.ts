@@ -1,9 +1,9 @@
 import { authHeaders } from "@/services/auth.service";
-import { addTask } from "@/infrastructure/lib/idb";
+import { addTask, pruneSyncedTasksMissingOnServer } from "@/infrastructure/lib/idb";
 
 const API_BASE = `http://${window.location.hostname}:4000`;
 
-// For routes that may have an image — use FormData
+// For routes that may have an image - use FormData
 function buildFormData(data: Record<string, any>, imageFile?: File | null): FormData {
   const fd = new FormData();
   Object.entries(data).forEach(([k, v]) => {
@@ -32,25 +32,33 @@ export async function fetchFromServer(
     if (!res.ok) throw new Error("fetch failed");
 
     const serverTasks = await res.json();
-    console.log("SERVER → LOCAL SYNC:", serverTasks.length);
+    console.log("SERVER -> LOCAL SYNC:", serverTasks.length);
+    const serverIds: string[] = [];
 
     for (const t of serverTasks) {
+      const id = t.taskId ?? t.id;
+      if (!id) continue;
+      serverIds.push(id);
+
       await addTask({
-        id:            t.taskId,
-        text:          t.text,
-        image:         t.imageUrl ?? t.image ?? null,  // store signed URL locally
-        completed:     t.completed,
-        archived:      t.archived,
-        deleted:       t.deleted,
-        deletedAt:     t.deletedAt ?? null,
-        sectionId:     t.sectionId ?? null,
-        createdAt:     t.createdAt,
-        updatedAt:     t.updatedAt,
+        id,
+        text: t.text,
+        image: t.imageUrl ?? t.image ?? null, // store signed URL locally
+        completed: t.completed,
+        archived: t.archived,
+        deleted: t.deleted,
+        deletedAt: t.deletedAt ?? null,
+        sectionId: t.sectionId ?? null,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
         userEmail,
         workspaceType: workspace,
-        syncStatus:    "synced",
+        syncStatus: "synced",
       });
     }
+
+    // Hard-deleted documents are absent from /tasks response.
+    await pruneSyncedTasksMissingOnServer(userEmail, workspace, serverIds);
   } catch (err) {
     console.warn("SERVER SYNC FAILED", err);
   }
@@ -58,16 +66,16 @@ export async function fetchFromServer(
 
 export async function apiCreateTask(task: any, token: string, imageFile?: File | null) {
   const fd = buildFormData({
-    id:            task.id,
-    text:          task.text,
+    id: task.id,
+    text: task.text,
     workspaceType: task.workspaceType,
-    ...(task.sectionId ? { sectionId: task.sectionId } : {}),  // ← empty string nahi
+    ...(task.sectionId ? { sectionId: task.sectionId } : {}), // empty string nahi
   }, imageFile);
 
   const res = await fetch(`${API_BASE}/tasks`, {
-    method:  "POST",
+    method: "POST",
     headers: authHeadersNoContentType(token),
-    body:    fd,
+    body: fd,
   });
 
   if (!res.ok) throw new Error("create failed");
@@ -88,9 +96,9 @@ export async function apiUpdateTask(
   );
 
   const res = await fetch(`${API_BASE}/tasks/${id}`, {
-    method:  "PUT",
+    method: "PUT",
     headers: authHeadersNoContentType(token),
-    body:    fd,
+    body: fd,
   });
 
   if (!res.ok) throw new Error("update failed");
@@ -99,10 +107,9 @@ export async function apiUpdateTask(
 
 export async function apiDeleteTask(id: string, token: string) {
   const res = await fetch(`${API_BASE}/tasks/${id}`, {
-    method:  "DELETE",
+    method: "DELETE",
     headers: authHeaders(token),
   });
 
   if (!res.ok) throw new Error("delete failed");
 }
-

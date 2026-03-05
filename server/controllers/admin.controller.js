@@ -83,6 +83,13 @@ export async function getAnalytics(req, res) {
 
     // 7. Total users
     User.countDocuments(),
+    /*
+    const result = await User.aggregate([
+  {
+    $count: "totalUsers"
+  }
+]);
+ */
 
     // 8. Growth over last 30 days
     Task.aggregate([

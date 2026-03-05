@@ -4,15 +4,15 @@ import { s3 } from './s3Client.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const BUCKET     = process.env.AWS_BUCKET_NAME;
-const EXPIRES_IN = 7 * 24 * 60 * 60; // 7 days 
+const EXPIRES_IN = 7 * 24 * 60 * 60; // url expiration time,,,
 
 export async function uploadImageToS3(fileBuffer, mimeType, userId) {
-  const ext = mimeType.split('/')[1] || 'jpg';
+  const ext = mimeType.split('/')[1] || 'jpg';//proper xtension png or jpeg...or fdefault jpg
   const key = `tasks/${userId}/${uuidv4()}.${ext}`;
   
   console.log('🪣 Uploading to bucket:', process.env.AWS_BUCKET_NAME);
-  console.log('🔑 Key:', key);
-  console.log('📏 Buffer size:', fileBuffer?.length);
+  //console.log('🔑 Key:', key);
+  //console.log('📏 Buffer size:', fileBuffer?.length);
 
   await s3.send(new PutObjectCommand({
     Bucket: BUCKET,
@@ -35,15 +35,14 @@ export async function deleteImageFromS3(key) {
   await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
 }
 
-// Attach fresh signed URL to a task object (plain JS obj, not mongoose doc)
-// Refreshes only if expiring within 5 min — updates DB silently in background
+
 export async function resolveImageUrl(task, TaskModel) {
   if (!task.image) return task;
 
   const now    = Date.now();
   const buffer = 5 * 60 * 1000;
 
-  if (task.imageUrl && task.imageUrlExpiry && (task.imageUrlExpiry - now) > buffer) {
+  if (task.imageUrl && task.imageUrlExpiry && (task.imageUrlExpiry - now) > buffer) {//task without image
     return task; // still valid
   }
 

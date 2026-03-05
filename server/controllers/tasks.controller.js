@@ -177,9 +177,23 @@ export const updateTask = async (req, res) => {
 // ─── Delete ───────────────────────────────────────────────────────────────────
 
 export const deleteTask =async (req, res) => {
+  const task = await Task.findOne({ taskId: req.params.id }).select('image').lean();
+  if (task?.image) {
+    await deleteImageFromS3(task.image);
+  }
+
   await Task.updateOne(
     { taskId: req.params.id },
-    { $set: { deleted: true, deletedAt: Date.now(), updatedAt: Date.now() } }
+    {
+      $set: {
+        deleted: true,
+        deletedAt: Date.now(),
+        updatedAt: Date.now(),
+        image: null,
+        imageUrl: null,
+        imageUrlExpiry: null,
+      },
+    }
   );
   res.json({ status: 'ok' });
 };
@@ -207,10 +221,26 @@ export const bulkDeleteTasks =async (req, res) => {
   const { taskIds } = req.body;
   if (!taskIds?.length) return res.json({ ok: true });
 
+  const tasks = await Task.find({
+    taskId: { $in: taskIds },
+    image: { $ne: null },
+  }).select('image').lean();
+
+  await Promise.allSettled(tasks.map(t => deleteImageFromS3(t.image)));
+
   const now    = Date.now();
   const result = await Task.updateMany(
     { taskId: { $in: taskIds } },
-    { $set: { deleted: true, deletedAt: now, updatedAt: now } }
+    {
+      $set: {
+        deleted: true,
+        deletedAt: now,
+        updatedAt: now,
+        image: null,
+        imageUrl: null,
+        imageUrlExpiry: null,
+      },
+    }
   );
   res.json({ ok: true, deleted: result.modifiedCount });
 };

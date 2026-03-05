@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { requireAuth } from '../middlewares/requireAuth.js';
 import { asyncHandler } from '../tryCatch/async.js';
 import { upload } from '../s3/upload.middleware.js';
 import {
@@ -16,15 +15,15 @@ import {
 
 const router = Router();
 
-router.post('/bulk-create',   requireAuth, asyncHandler(bulkCreateTasks));
-router.post('/',              requireAuth, upload.single('image'),asyncHandler(createTask));
-router.get('/',               requireAuth, asyncHandler(getAllTasks));
-router.put('/bulk-update',    requireAuth, asyncHandler(bulkUpdateTasks));
-router.put('/:id',            requireAuth, upload.single('image'),asyncHandler( updateTask));
-router.delete('/bulk-delete', requireAuth, asyncHandler(bulkDeleteTasks));
-router.delete('/:id',         requireAuth, asyncHandler(deleteTask));
+router.post('/bulk-create',   asyncHandler(bulkCreateTasks));
+router.post('/',              upload.single('image'),asyncHandler(createTask));
+router.get('/',               asyncHandler(getAllTasks));
+router.put('/bulk-update',    asyncHandler(bulkUpdateTasks));
+router.put('/:id',            upload.single('image'),asyncHandler( updateTask));
+router.delete('/bulk-delete', asyncHandler(bulkDeleteTasks));
+router.delete('/:id',         asyncHandler(deleteTask));
 
-router.get('/workspace-id', requireAuth, asyncHandler(getWorkspaceId));
-router.get('/sync',         requireAuth, asyncHandler(syncTasks));
+router.get('/workspace-id',   asyncHandler(getWorkspaceId));
+router.get('/sync',           asyncHandler(syncTasks));
 
 export default router;
