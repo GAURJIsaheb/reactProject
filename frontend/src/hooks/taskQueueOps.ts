@@ -75,3 +75,22 @@ export async function queueDelete(
 export async function removeQueueJob(jobId: string) {
   await removeFromQueue(jobId);
 }
+
+export async function queueNotificationDelete(
+  notificationId: string,
+  userEmail: string,
+  workspace: string
+): Promise<string> {
+  const jobId = crypto.randomUUID();
+  await addToQueue({
+    id: jobId,
+    action: "notification-delete",
+    taskId: notificationId,
+    userEmail,
+    workspaceType: workspace,
+    payload: {},
+    retry: 0,
+    nextRetry: Date.now(),
+  });
+  return jobId;
+}

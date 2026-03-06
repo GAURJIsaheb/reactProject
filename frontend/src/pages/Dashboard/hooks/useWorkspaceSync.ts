@@ -9,7 +9,8 @@ export function useWorkspaceSync(
   setWorkspaceId: (id: string | null) => void,
   workspaceId: string | null,
   reloadTasks: () => Promise<void>,
-  loadSections: () => Promise<void>
+  loadSections: () => Promise<void>,
+  reloadNotifications: () => Promise<void>
 ) {
   // resolve workspaceId
   useEffect(() => {
@@ -43,6 +44,7 @@ export function useWorkspaceSync(
       if (hasNew && !cancelled) {
         await reloadTasks();
         await loadSections();
+        await reloadNotifications();
       }
     };
 
@@ -58,5 +60,5 @@ export function useWorkspaceSync(
       clearInterval(interval);
       window.removeEventListener("focus", onFocus);
     };
-  }, [token, workspaceId]);
+  }, [token, workspaceId, workspace, userEmail, reloadTasks, loadSections]);
 }

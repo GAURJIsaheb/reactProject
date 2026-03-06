@@ -2,15 +2,17 @@ import { openDB } from "idb";
 import type { Task } from "@/shared/types/task";
 import type { QueueJob } from "@/shared/types/queue";
 import type { Section } from "@/shared/types/section";
+import type { AppNotification } from "@/shared/types/notification";
 
 const DB_NAME = "MyTodoApp";
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 const STORE_TASKS = "tasks";
 const STORE_USER = "user";
 const STORE_SYNC = "syncQueue";
 const STORE_ARCHIVE = "archives";
 const STORE_SECTIONS = "sections";
+const STORE_NOTIFICATIONS = "notifications";
 
 export async function initDB() {
   return openDB(DB_NAME, DB_VERSION, {
@@ -31,6 +33,10 @@ export async function initDB() {
       }
       if (!db.objectStoreNames.contains(STORE_ARCHIVE)) {
         db.createObjectStore(STORE_ARCHIVE, { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains(STORE_NOTIFICATIONS)) {
+        const n = db.createObjectStore(STORE_NOTIFICATIONS, { keyPath: "id" });
+        n.createIndex("byWorkspace", "workspaceType");
       }
     },
   });
@@ -195,6 +201,7 @@ export async function clearAllUserData() {
   await db.clear("tasks");
   await db.clear("syncQueue");
   await db.clear("user");
+  await db.clear(STORE_NOTIFICATIONS);
 }
 
 export async function upsertQueue(job: QueueJob): Promise<void> {
@@ -272,6 +279,82 @@ export async function updateTaskSectionInIDB(
   });
 }
 
+export async function upsertNotification(notification: AppNotification): Promise<void> {
+  const db = await initDB();
+  await db.put(STORE_NOTIFICATIONS, notification);
+}
 
+export async function getAllNotifications(
+  userEmail: string,
+  workspaceType: string
+): Promise<AppNotification[]> {
+  if (!userEmail) return [];
+  const db = await initDB();
+  const all = await db.getAll(STORE_NOTIFICATIONS);
+  return all
+    .filter(
+      (n) =>
+        n.userEmail === userEmail &&
+        n.workspaceType === workspaceType &&
+        !n.deleted
+    )
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+export async function softDeleteNotificationInIDB(id: string): Promise<void> {
+  if (!id) return;
+  const db = await initDB();
+  const existing = await db.get(STORE_NOTIFICATIONS, id);
+  if (!existing) return;
+  await db.put(STORE_NOTIFICATIONS, {
+    ...existing,
+    deleted: true,
+    deletedAt: Date.now(),
+    updatedAt: Date.now(),
+    syncStatus: "pending",
+  });
+}
+
+export async function getNotificationById(id: string): Promise<AppNotification | null> {
+  if (!id) return null;
+  const db = await initDB();
+  return db.get(STORE_NOTIFICATIONS, id);
+}
+
+export async function markAllNotificationsReadInIDB(
+  userEmail: string,
+  workspaceType: string
+): Promise<void> {
+  const db = await initDB();
+  const all = await db.getAll(STORE_NOTIFICATIONS);
+  const tx = db.transaction(STORE_NOTIFICATIONS, "readwrite");
+  for (const n of all) {
+    if (
+      n.userEmail === userEmail &&
+      n.workspaceType === workspaceType &&
+      !n.deleted &&
+      !n.read
+    ) {
+      tx.store.put({ ...n, read: true, updatedAt: Date.now() });
+    }
+  }
+  await tx.done;
+}
+
+export async function mergeNotificationsFromServer(
+  serverNotifications: AppNotification[]
+): Promise<void> {
+  if (serverNotifications.length === 0) return;
+  const db = await initDB();
+  const tx = db.transaction(STORE_NOTIFICATIONS, "readwrite");
+  for (const n of serverNotifications) {
+    const existing = await tx.store.get(n.id);
+    const localIsNewer = existing?.syncStatus === "pending" && existing.updatedAt > n.updatedAt;
+    if (!localIsNewer) {
+      tx.store.put({ ...n, syncStatus: "synced" });
+    }
+  }
+  await tx.done;
+}
 
 //for sync task

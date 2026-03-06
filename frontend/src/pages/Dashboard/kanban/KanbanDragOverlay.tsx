@@ -32,7 +32,6 @@ export default function KanbanDragOverlay({
             index={0}
             onDelete={() => {}}
             onToggle={() => {}}
-            onEdit={() => {}}
             onView={() => {}}
           />
         </div>

@@ -13,11 +13,9 @@ export async function processQueue(token: string) {
 
   (processQueue as any)._running = true;
 
-  // Filter out jobs that have exceeded max retries
   const eligible = queue.filter((i) => (i.retry ?? 0) < MAX_RETRY);
   const exhausted = queue.filter((i) => (i.retry ?? 0) >= MAX_RETRY);
 
-  // Drop exhausted jobs so they don't clog the queue permanently
   for (const item of exhausted) {
     console.warn(`Dropping job ${item.id} after ${MAX_RETRY} retries`);
     await removeFromQueue(item.id);
@@ -31,6 +29,9 @@ export async function processQueue(token: string) {
   const creates = eligible.filter((i) => i.action === "create");
   const updates = eligible.filter((i) => i.action === "update");
   const deletes = eligible.filter((i) => i.action === "delete");
+  const notificationDeletes = eligible.filter(
+    (i) => i.action === "notification-delete"
+  );
 
   try {
     if (creates.length > 0) {
@@ -62,16 +63,27 @@ export async function processQueue(token: string) {
       if (!res.ok) throw new Error("bulk-delete failed");
     }
 
-    // All succeeded — mark tasks as synced and clear queue
+    if (notificationDeletes.length > 0) {
+      const res = await fetch(`${API_BASE}/notifications/bulk-delete`, {
+        method: "DELETE",
+        headers: authHeaders(token),
+        body: JSON.stringify({
+          notificationIds: notificationDeletes.map((i) => i.taskId),
+        }),
+      });
+      if (!res.ok) throw new Error("bulk-notification-delete failed");
+    }
+
     for (const item of eligible) {
-      const task = await getTaskById(item.taskId);
-      if (task) await addTask({ ...task, syncStatus: "synced" });
+      if (item.action !== "notification-delete") {
+        const task = await getTaskById(item.taskId);
+        if (task) await addTask({ ...task, syncStatus: "synced" });
+      }
       await removeFromQueue(item.id);
     }
   } catch (err) {
     console.warn("Bulk sync failed, incrementing retry counts:", err);
 
-    // Increment retry counter on every failed job so they back off over time
     for (const item of eligible) {
       await updateQueue({ ...item, retry: (item.retry ?? 0) + 1 });
     }

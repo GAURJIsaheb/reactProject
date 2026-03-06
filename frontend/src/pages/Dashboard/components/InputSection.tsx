@@ -1,18 +1,46 @@
-import { Paperclip, Plus, Hash } from "lucide-react";
-import { useRef, forwardRef } from "react";
+import { Paperclip, Plus, Hash, CalendarDays, Clock3 } from "lucide-react";
+import { useRef, forwardRef, useMemo } from "react";
 
 type Props = {
   input: string;
   setInput: (v: string) => void;
   imageFile: File | null;
   setImageFile: (f: File | null) => void;
+  reminderDate: string;
+  setReminderDate: (v: string) => void;
+  reminderTime: string;
+  setReminderTime: (v: string) => void;
   handleAdd: () => void;
   sectionName?: string;
 };
 
 const InputSection = forwardRef<HTMLInputElement, Props>(
-  ({ input, setInput, imageFile, setImageFile, handleAdd, sectionName }, ref) => {
+  ({
+    input,
+    setInput,
+    imageFile,
+    setImageFile,
+    reminderDate,
+    setReminderDate,
+    reminderTime,
+    setReminderTime,
+    handleAdd,
+    sectionName,
+  }, ref) => {
     const fileRef = useRef<HTMLInputElement>(null);
+    const reminderTimeOptions = useMemo(() => {
+      const options: { value: string; label: string }[] = [];
+      for (let hour = 0; hour < 24; hour += 1) {
+        for (const minute of [0, 30]) {
+          const value = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+          const twelveHour = hour % 12 || 12;
+          const suffix = hour < 12 ? "AM" : "PM";
+          const label = `${twelveHour}:${String(minute).padStart(2, "0")} ${suffix}`;
+          options.push({ value, label });
+        }
+      }
+      return options;
+    }, []);
 
     return (
       <div style={{ position: "relative", marginBottom: "2rem" }}>
@@ -88,6 +116,37 @@ const InputSection = forwardRef<HTMLInputElement, Props>(
             <Plus size={16} />
             Add
           </button>
+        </div>
+
+        <div className="mt-2 px-1">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-card/60 px-3 py-2">
+              <CalendarDays size={13} className="text-foreground outline-none border border-border" />
+              <input
+                type="date"
+                value={reminderDate}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setReminderDate(e.target.value)}
+                className="bg-background text-[12px] text-foreground outline-none"
+              />
+            </div>
+
+            <div className="flex items-center text-foreground gap-2 rounded-xl border border-border bg-card/60 px-3 py-2 min-w-44">
+              <Clock3 size={13} className="text-foreground" />
+              <select
+                value={reminderTime}
+                onChange={(e) => setReminderTime(e.target.value)}
+                className="w-full bg-background text-[12px] text-foreground outline-none scheme-light dark:scheme:dark [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
+              >
+                <option value="">Reminder time</option>
+                {reminderTimeOptions.map((option) => (
+                  <option  key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
       </div>
     );

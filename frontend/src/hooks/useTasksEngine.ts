@@ -106,7 +106,7 @@ export function useTasksEngine() {
     // Offline — queue mein daalo
     const jobId = crypto.randomUUID();
     await queueCreate(task, userEmail, workspace, jobId);
-    return;
+    return task;
   }
 
   // Online — seedha API call, queue mat karo abhi
@@ -123,10 +123,12 @@ export function useTasksEngine() {
     setTasks((prev) =>
       prev.map((t) => (t.id === task.id ? syncedTask : t))
     );
+    return syncedTask;
   } catch {
     // Failed — ab queue mein daalo retry ke liye
     const jobId = crypto.randomUUID();
     await queueCreate(task, userEmail, workspace, jobId);
+    return task;
   }
 }
   // ─── Toggle Complete ──────────────────────────────────────────────────────────

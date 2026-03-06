@@ -6,6 +6,7 @@ import {
   deleteImageFromS3,
   resolveImageUrl,
 } from '../s3/s3Service.js';
+import { upsertTaskCompletedNotification } from './notifications.controller.js';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -139,6 +140,7 @@ export const updateTask = async (req, res) => {
 
   const task = await Task.findOne({ taskId });
   if (!task) return res.status(404).json({ error: 'Task not found' });
+  const wasCompleted = task.completed;
 
   const { text, completed, archived, sectionId, removeImage } = req.body;
 
@@ -167,6 +169,15 @@ export const updateTask = async (req, res) => {
   task.version  += 1;
 
   await task.save();
+
+  if (!wasCompleted && task.completed) {
+    await upsertTaskCompletedNotification({
+      taskId: task.taskId,
+      taskText: task.text,
+      userId: task.createdBy,
+      workspaceType: task.workspaceType,
+    });
+  }
 
   const taskObj  = task.toObject();
   const resolved = await resolveImageUrl(taskObj, Task);
@@ -204,6 +215,17 @@ export const bulkUpdateTasks = async (req, res) => {
   const { updates } = req.body;
   if (!updates?.length) return res.json({ ok: true });
 
+  const completionTargets = updates
+    .filter((u) => u?.payload?.completed === true)
+    .map((u) => u.taskId);
+
+  const toNotify = completionTargets.length
+    ? await Task.find({
+        taskId: { $in: completionTargets },
+        completed: false,
+      }).select('taskId text createdBy workspaceType').lean()
+    : [];
+
   const bulkOps = updates.map(({ taskId, payload }) => ({
     updateOne: {
       filter: { taskId },
@@ -212,6 +234,20 @@ export const bulkUpdateTasks = async (req, res) => {
   }));
 
   const result = await Task.bulkWrite(bulkOps, { ordered: false });
+
+  if (toNotify.length > 0) {
+    await Promise.allSettled(
+      toNotify.map((t) =>
+        upsertTaskCompletedNotification({
+          taskId: t.taskId,
+          taskText: t.text,
+          userId: t.createdBy,
+          workspaceType: t.workspaceType,
+        })
+      )
+    );
+  }
+
   res.json({ ok: true, modified: result.modifiedCount });
 };
 

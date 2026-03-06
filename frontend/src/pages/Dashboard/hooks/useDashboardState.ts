@@ -5,7 +5,6 @@ export function useDashboardState() {
   const [loading, setLoading] = useState(true);
 
   const [viewTask, setViewTask] = useState<Task | null>(null);
-  const [editTask, setEditTask] = useState<Task | null>(null);
 
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<string>("new");
@@ -14,6 +13,8 @@ export function useDashboardState() {
 
   const [input, setInput] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [reminderDate, setReminderDate] = useState("");
+  const [reminderTime, setReminderTime] = useState("");
 
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
@@ -22,12 +23,13 @@ export function useDashboardState() {
   return {
     loading, setLoading,
     viewTask, setViewTask,
-    editTask, setEditTask,
     search, setSearch,
     sort, setSort,
     activeSectionId, setActiveSectionId,
     input, setInput,
     imageFile, setImageFile,
+    reminderDate, setReminderDate,
+    reminderTime, setReminderTime,
     workspaceId, setWorkspaceId,
     taskInputRef
   };

@@ -1,11 +1,6 @@
-import { Pencil, Trash2, Check } from "lucide-react";
-import { DropdownMenu,  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger } from "../ui/dropdown-menu";
+import { useMemo, useState } from "react";
+import { Trash2, Check } from "lucide-react";
 import type { Task } from "@/shared/types/task";
-
-// ─── Palettes ─────────────────────────────────────────────────────────────────
 
 const CARD_PALETTES = [
   {
@@ -64,35 +59,45 @@ function getPalette(index: number) {
   return CARD_PALETTES[index % CARD_PALETTES.length];
 }
 
-// ─── Props ────────────────────────────────────────────────────────────────────
-
 interface Props {
   task: Task;
   index: number;
   onDelete: (id: string) => void;
   onToggle: (id: string, e?: React.MouseEvent) => void;
-  onEdit: (task: Task) => void;
   onView: (task: Task) => void;
   isDragging?: boolean;
   isJustCompleted?: boolean;
-  // dragHandleProps kept for API compat but unused — whole card is draggable via wrapper
+  reminderLabel?: string | null;
   dragHandleProps?: React.HTMLAttributes<HTMLElement>;
 }
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function TaskCard({
   task,
   index,
   onDelete,
   onToggle,
-  onEdit,
   onView,
   isDragging = false,
   isJustCompleted = false,
+  reminderLabel,
 }: Props) {
   const palette = getPalette(index);
   const isCompleted = task.completed;
+  const hasImage = Boolean(task.imageUrl || task.image);
+  const [showImage, setShowImage] = useState(false);
+  const { title, description } = useMemo(() => {
+    const raw = (task.text ?? "").trim();
+    const lines = raw
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (lines.length > 1) {
+      return { title: lines[0], description: lines.slice(1).join(" ") };
+    }
+
+    return { title: raw, description: "" };
+  }, [task.text]);
 
   return (
     <div
@@ -116,10 +121,7 @@ export default function TaskCard({
         .filter(Boolean)
         .join(" ")}
     >
-      {/* ── Top row ── */}
       <div className="flex items-start gap-2.5">
-
-        {/* Checkbox */}
         <button
           type="button"
           onClick={(e) => {
@@ -131,7 +133,7 @@ export default function TaskCard({
             "font-bold transition-all duration-300 shadow-sm",
             isCompleted
               ? `bg-linear-to-br ${palette.check} border-2 border-transparent text-white shadow-md scale-110 ring-2 ${palette.ring}`
-              : `bg-white/70 border-2 border-black/20 hover:border-black/40 hover:bg-white/90`,
+              : "bg-white/70 border-2 border-black/20 hover:border-black/40 hover:bg-white/90",
           ]
             .filter(Boolean)
             .join(" ")}
@@ -139,11 +141,10 @@ export default function TaskCard({
           {isCompleted ? (
             <Check size={14} strokeWidth={3} />
           ) : (
-            <span className="text-[10px] opacity-0 group-hover:opacity-30">✓</span>
+            <span className="text-[10px] opacity-0 group-hover:opacity-30">v</span>
           )}
         </button>
 
-        {/* Text */}
         <div className="flex-1 min-w-0">
           <p
             className={[
@@ -158,67 +159,85 @@ export default function TaskCard({
                 : undefined
             }
           >
-            {task.text}
+            {title}
           </p>
+          {description && (
+            <p
+              className={[
+                "mt-1 text-[12px] leading-snug opacity-80",
+                isCompleted ? "text-gray-500/70" : `${palette.text}`,
+              ].join(" ")}
+              style={{
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {description}
+            </p>
+          )}
         </div>
 
-        {/* Menu */}
         <div
           onClick={(e) => e.stopPropagation()}
           className={`shrink-0 transition-opacity ${
             isCompleted ? "opacity-40" : "opacity-60 hover:opacity-100"
           }`}
         >
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className={[
-                  "w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold transition",
-                  isCompleted
-                    ? "bg-gray-200/40 hover:bg-gray-300/50 text-gray-500"
-                    : "bg-black/5 hover:bg-black/15 text-black/60 hover:text-black",
-                ].join(" ")}
-              >
-                ···
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-40 rounded-xl bg-background">
-              {!isCompleted && (
-                <>
-                  <DropdownMenuItem
-                    onClick={() => onEdit(task)}
-                    className="cursor-pointer "
-                  >
-                    <Pencil size={13} className="mr-2 text-yellow-600" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                </>
-              )}
-              <DropdownMenuItem
-                className="text-red-500 focus:text-red-600 focus:bg-red-50 cursor-pointer"
-                onClick={() => onDelete(task.id)}
-              >
-                <Trash2 size={13} className="mr-2" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <button
+            type="button"
+            className="inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-semibold text-red-500 hover:text-red-600 hover:bg-red-50/80 transition"
+            onClick={() => onDelete(task.id)}
+          >
+            <Trash2 size={13} className="mr-2" />
+            Delete
+          </button>
         </div>
       </div>
 
-      {/* ── Image ── */}
-      {(task.imageUrl || task.image) && (
-        <div className={`flex justify-center ${isCompleted ? "opacity-60" : ""}`}>
-          <img
-            src={task.imageUrl ?? task.image!}
-            alt="attachment"
-            className="w-[75%] aspect-video object-cover rounded-sm shadow-sm"
-          />
+      {hasImage && (
+        <>
+          <div className="flex">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowImage((prev) => !prev);
+              }}
+              className={`text-[11px] font-semibold underline underline-offset-2 ${
+                isCompleted ? "text-gray-500" : palette.sub
+              }`}
+            >
+              {showImage ? "Hide image" : "View image"}
+            </button>
+          </div>
+          {showImage && (
+            <div className={`flex justify-center ${isCompleted ? "opacity-60" : ""}`}>
+              <img
+                src={task.imageUrl ?? task.image!}
+                alt="attachment"
+                loading="lazy"
+                decoding="async"
+                className="w-[75%] aspect-video object-cover rounded-sm shadow-sm"
+              />
+            </div>
+          )}
+        </>
+      )}
+
+      {reminderLabel && (
+        <div
+          className={`mt-0.5 inline-flex items-center self-start px-2 py-1 rounded-full text-[10px] font-semibold border ${
+            isCompleted
+              ? "border-gray-400/40 text-gray-500 bg-gray-200/40"
+              : "border-indigo-400/50 text-indigo-700 bg-indigo-300/25"
+          }`}
+        >
+          Reminder: {reminderLabel}
         </div>
       )}
 
-      {/* ── Bottom row ── */}
       <div
         className={`flex items-center justify-between mt-1 text-[11px] ${
           isCompleted ? "opacity-50" : ""
@@ -248,7 +267,6 @@ export default function TaskCard({
         </div>
       </div>
 
-      {/* ── Accent bar — hidden when done ── */}
       {!isCompleted && (
         <div
           className={`

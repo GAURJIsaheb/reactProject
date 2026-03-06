@@ -14,6 +14,10 @@ type Props = {
 
   imageFile: File | null;
   setImageFile: (f: File | null) => void;
+  reminderDate: string;
+  setReminderDate: (v: string) => void;
+  reminderTime: string;
+  setReminderTime: (v: string) => void;
 
   activeSectionId: string | null;
   setActiveSectionId: (v: string | null) => void;
@@ -23,7 +27,8 @@ type Props = {
 
   tasks: Task[];
 
-  createTask: (text: string, image: File | null, sectionId: string) => Promise<void>;
+  createTask: (text: string, image: File | null, sectionId: string) => Promise<Task>;
+  onTaskReminderSet: (taskId: string, taskText: string, dueAt: number | null) => void;
   deleteTask: (id: string) => void;
   reloadTasks: () => Promise<void>;
 
@@ -59,12 +64,17 @@ export function useTaskActions({
   setInput,
   imageFile,
   setImageFile,
+  reminderDate,
+  setReminderDate,
+  reminderTime,
+  setReminderTime,
   activeSectionId,
   setActiveSectionId,
   sections,
   hasNoSections,
   tasks,
   createTask,
+  onTaskReminderSet,
   deleteTask,
   reloadTasks,
   workspace,
@@ -72,6 +82,13 @@ export function useTaskActions({
   token,
   taskInputRef,
 }: Props) {
+  const resolveReminderAt = useCallback((): number | null => {
+    if (!reminderDate && !reminderTime) return null;
+    if (!reminderDate || !reminderTime) return NaN;
+
+    const dueAt = new Date(`${reminderDate}T${reminderTime}:00`).getTime();
+    return Number.isFinite(dueAt) ? dueAt : NaN;
+  }, [reminderDate, reminderTime]);
 
   // ─── ADD TASK ─────────────────────────────────────────────
 
@@ -84,11 +101,24 @@ export function useTaskActions({
 
     // Pass raw File — NO base64 conversion
     const fileToUpload = imageFile ?? null;
+    const reminderAt = resolveReminderAt();
+
+    if (Number.isNaN(reminderAt)) {
+      toast.error("Reminder date and time both required");
+      return;
+    }
+    if (reminderAt !== null && reminderAt <= Date.now()) {
+      toast.error("Reminder time should be in future");
+      return;
+    }
 
     setInput("");
     setImageFile(null);
+    setReminderDate("");
+    setReminderTime("");
 
-    await createTask(trimmed, fileToUpload, targetSectionId);
+    const createdTask = await createTask(trimmed, fileToUpload, targetSectionId);
+    onTaskReminderSet(createdTask.id, trimmed, reminderAt);
 
     playSuccessSound();
 
@@ -97,7 +127,20 @@ export function useTaskActions({
       duration: 2500,
     });
 
-  }, [input, imageFile, activeSectionId, sections, hasNoSections, createTask]);
+  }, [
+    input,
+    imageFile,
+    activeSectionId,
+    sections,
+    hasNoSections,
+    createTask,
+    reminderDate,
+    reminderTime,
+    resolveReminderAt,
+    setReminderDate,
+    setReminderTime,
+    onTaskReminderSet,
+  ]);
 
   // ─── DELETE TASK ──────────────────────────────────────────
 
@@ -121,8 +164,8 @@ export function useTaskActions({
       text: string,
       imageFile?: File | null,
       removeImage?: boolean
-    ) => {
-      if (!userEmail) return;
+    ): Promise<boolean> => {
+      if (!userEmail) return false;
 
       // IDB optimistic update — clear image if removing, keep existing if no change
       const idbUpdate: any = {
@@ -151,18 +194,20 @@ export function useTaskActions({
 
       // Online push via FormData
       try {
-        if (!token) return;
-        const result = await apiUpdateTask(id, { text }, token, imageFile, removeImage);
+        if (token) {
+          const result = await apiUpdateTask(id, { text }, token, imageFile, removeImage);
 
-        // Update IDB with fresh signed URL from server
-        if (result?.task?.imageUrl) {
-          await addTask({ id, image: result.task.imageUrl });
+          // Update IDB with fresh signed URL from server
+          if (result?.task?.imageUrl) {
+            await addTask({ id, image: result.task.imageUrl });
+          }
         }
       } catch {
         // offline — queue handles it
       }
 
       await reloadTasks();
+      return true;
     },
     [userEmail, workspace, token, reloadTasks]
   );

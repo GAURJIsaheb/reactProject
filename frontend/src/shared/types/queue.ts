@@ -2,7 +2,7 @@ import type { Task } from "./task";
 
 export interface QueueJob {
   id: string;
-  action: "create" | "update" | "delete";
+  action: "create" | "update" | "delete" | "notification-delete";
   taskId: string;
   workspaceType?: string;
   payload?: Partial<Task>;  
