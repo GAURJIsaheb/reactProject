@@ -13,7 +13,7 @@ const taskSchema = new mongoose.Schema({
   deleted:       { type: Boolean, default: false },
   deletedAt:     { type: Number,  default: null },
   createdBy:     { type: mongoose.Schema.Types.ObjectId, ref: 'users', required: true },
-  workspaceType: { type: String,  enum: ['personal', 'professional'], required: true },
+  workspaceType: { type: String,  required: true, trim: true },
   version:       { type: Number,  default: 1 },
   createdAt:     { type: Number,  default: () => Date.now() },
   updatedAt:     { type: Number,  default: () => Date.now() },

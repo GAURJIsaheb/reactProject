@@ -1,6 +1,6 @@
 export interface Section {
   id: string;
-  workspaceType: "personal" | "professional";
+  workspaceType: string;
   userEmail: string;
   title: string;
   order: number;

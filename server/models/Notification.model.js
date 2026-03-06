@@ -6,7 +6,7 @@ const notificationSchema = new mongoose.Schema({
   taskId: { type: String, required: true },
   taskText: { type: String, required: true, trim: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'users', required: true },
-  workspaceType: { type: String, enum: ['personal', 'professional'], required: true },
+  workspaceType: { type: String, required: true, trim: true },
   read: { type: Boolean, default: false },
   deleted: { type: Boolean, default: false },
   deletedAt: { type: Number, default: null },

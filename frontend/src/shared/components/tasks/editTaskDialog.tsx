@@ -140,7 +140,7 @@ export default function ViewTaskDialog({
 
         <DialogHeader className="pt-1">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <DialogTitle className="text-[20px] font-extrabold tracking-[-0.3px] bg-linear-to-br from-slate-900 to-indigo-600 bg-clip-text text-transparent dark:from-[#e8eaf0] dark:to-indigo-300">
+            <DialogTitle className="text-[30px] font-bold tracking-[-0.3px] bg-linear-to-br from-slate-900 to-indigo-600 bg-clip-text text-transparent dark:from-[#e8eaf0] dark:to-indigo-300">
               Task Details
             </DialogTitle>
 
@@ -209,7 +209,7 @@ export default function ViewTaskDialog({
               Attachment
             </div>
             <div className="flex gap-4 items-start">
-              <div className="w-24 h-24 rounded-xl border border-slate-200 bg-white flex items-center justify-center overflow-hidden relative shrink-0 dark:border-white/10 dark:bg-white/5">
+              <div className="w-44 h-44 rounded-xl border border-slate-200 bg-white flex items-center justify-center overflow-hidden relative shrink-0 dark:border-white/10 dark:bg-white/5">
                 {preview ? (
                   <>
                     <img src={preview} alt="preview" className="w-full h-full object-cover" />
@@ -259,7 +259,7 @@ export default function ViewTaskDialog({
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="mt-1 flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-indigo-500 to-pink-500 text-white text-[10px] font-extrabold disabled:opacity-60"
+            className="mt-1 flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-indigo-500 to-pink-500 text-white text-[15px]  "
           >
             <Save size={14} />
             {isSaving ? "Saving..." : "Save Changes"}

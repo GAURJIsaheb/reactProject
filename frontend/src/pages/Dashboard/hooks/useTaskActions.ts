@@ -45,8 +45,7 @@ function playSuccessSound() {
   try {
     const audio = new Audio(taskAddSound);
     audio.play();
-  } catch {
-    // Audio not available — silently skip
+  } catch {// Audio not available — silently skip
   }
 }
 
@@ -54,8 +53,7 @@ function deleteTaskSound() {
   try {
     const audio = new Audio(taskDeleteSound);
     audio.play();
-  } catch {
-    // Audio not available — silently skip
+  } catch {// Audio not available — silently skip
   }
 }
 

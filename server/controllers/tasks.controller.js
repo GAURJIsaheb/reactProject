@@ -15,12 +15,36 @@ async function attachSignedUrls(tasks) {
   return Promise.all(tasks.map(t => resolveImageUrl(t, Task)));
 }
 
+function normalizeWorkspaceType(workspaceType) {
+  return String(workspaceType ?? 'personal').trim().toLowerCase() || 'personal';
+}
+
+async function ensureWorkspace(userId, workspaceType) {
+  const type = normalizeWorkspaceType(workspaceType);
+  let workspace = await Workspace.findOne({ owner: userId, type }).lean();
+  if (workspace) return workspace;
+
+  try {
+    workspace = await Workspace.create({
+      workspaceId: crypto.randomUUID(),
+      owner: userId,
+      type,
+      members: [userId],
+    });
+    return workspace.toObject();
+  } catch (err) {
+    if (err?.code !== 11000) throw err;
+    return Workspace.findOne({ owner: userId, type }).lean();
+  }
+}
+
 // ─── Create ───────────────────────────────────────────────────────────────────
 export const createTask = async (req, res) => {
   const { id, text, workspaceType, sectionId } = req.body;
   const { userId } = req.user;
+  const normalizedWorkspaceType = normalizeWorkspaceType(workspaceType);
 
-  const workspace = await Workspace.findOne({ owner: userId, type: workspaceType ?? 'personal' }).lean();
+  const workspace = await ensureWorkspace(userId, normalizedWorkspaceType);
   if (!workspace) return res.status(404).json({ error: 'workspace not found' });
 
   const existing = await Task.findOne({ taskId: id }).lean();
@@ -71,7 +95,7 @@ export const createTask = async (req, res) => {
     text,
     image:         imageKey,
     createdBy:     userId,
-    workspaceType: workspaceType ?? 'personal',
+    workspaceType: normalizedWorkspaceType,
   });
 
   const taskObj  = task.toObject();
@@ -86,18 +110,18 @@ export const bulkCreateTasks =async (req, res) => {
   const { tasks } = req.body;
   if (!tasks?.length) return res.json({ ok: true });
 
-  const types = [...new Set(tasks.map(t => t.workspaceType ?? 'personal'))];
+  const types = [...new Set(tasks.map(t => normalizeWorkspaceType(t.workspaceType)))];
   const { userId } = req.user;
 
   const workspaceMap = {};
   for (const type of types) {
-    const ws = await Workspace.findOne({ owner: userId, type }).lean();
+    const ws = await ensureWorkspace(userId, type);
     if (ws) workspaceMap[type] = ws.workspaceId;
   }
 
   const docs = tasks.map(t => ({
     taskId:        t.id,
-    workspaceId:   workspaceMap[t.workspaceType ?? 'personal'],
+    workspaceId:   workspaceMap[normalizeWorkspaceType(t.workspaceType)],
     sectionId:     t.sectionId ?? null,
     text:          t.text,
     image:         t.image || null,   // bulk create accepts S3 keys only (no upload here)
@@ -105,7 +129,7 @@ export const bulkCreateTasks =async (req, res) => {
     archived:      t.archived   ?? false,
     deleted:       t.deleted    ?? false,
     createdBy:     userId,
-    workspaceType: t.workspaceType ?? 'personal',
+    workspaceType: normalizeWorkspaceType(t.workspaceType),
     createdAt:     t.createdAt  ?? Date.now(),
     updatedAt:     t.updatedAt  ?? Date.now(),
     version:       1,
@@ -123,8 +147,9 @@ export const bulkCreateTasks =async (req, res) => {
 export const getAllTasks = async (req, res) => {
   const { workspaceType } = req.query;
   const { userId } = req.user;
+  const normalizedWorkspaceType = normalizeWorkspaceType(workspaceType);
 
-  const ws = await Workspace.findOne({ owner: userId, type: workspaceType ?? 'personal' }).lean();
+  const ws = await ensureWorkspace(userId, normalizedWorkspaceType);
   if (!ws) return res.json([]);
 
   const tasks        = await Task.find({ workspaceId: ws.workspaceId, deleted: false }).lean();
@@ -286,8 +311,9 @@ export const bulkDeleteTasks =async (req, res) => {
 export const getWorkspaceId = async (req, res) => {
   const { workspaceType } = req.query;
   const { userId } = req.user;
+  const normalizedWorkspaceType = normalizeWorkspaceType(workspaceType);
 
-  const ws = await Workspace.findOne({ owner: userId, type: workspaceType ?? 'personal' }).lean();
+  const ws = await ensureWorkspace(userId, normalizedWorkspaceType);
   if (!ws) return res.status(404).json({ error: 'workspace not found' });
 
   res.json({ workspaceId: ws.workspaceId });
