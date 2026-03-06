@@ -1,10 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useAuthStore } from "@/zustand/authStore";
 import { useTasksEngine } from "@/hooks/useTasksEngine";
 import { useSectionsEngine } from "@/hooks/useSectionsEngine";
 import { useTheme } from "@/shared/components/toggleTheme/theme";
+import { toast } from "sonner";
 
-import HeaderSection from "./components/HeaderSection";
+import HeaderSection from "./components/header/HeaderSection";
 import StatsBar from "./components/StatsBar";
 import SearchBar from "./components/SearchBar";
 import Archive from "@/archive/archive";
@@ -12,13 +13,13 @@ import KanbanBoard from "./kanban/KanbanBoard";
 import EmptyBoardState from "./components/EmptyBoardState";
 import KanbanSkeleton from "./components/KanbanSkeleton";
 
-import ViewTaskDialog from "@/shared/components/tasks/viewTaskDialog";
-import EditTaskDialog from "@/shared/components/tasks/editTaskDialog";
+import ViewTaskDialog from "@/shared/components/tasks/editTaskDialog";
 
 import { useDashboardState } from "./hooks/useDashboardState";
 import { useDashboardDerived } from "./hooks/useDashboardDerived";
 import { useTaskActions } from "./hooks/useTaskActions";
 import { useWorkspaceSync } from "./hooks/useWorkspaceSync";
+import { useDashboardNotifications } from "./hooks/useDashboardNotifications";
 
 import InputSection from "./components/InputSection";
 
@@ -33,6 +34,8 @@ export default function Dashboard() {
     tasks,
     workspace,
     setWorkspace,
+    workspaceOptions,
+    addWorkspace,
     createTask,
     toggleComplete,
     deleteTask,
@@ -53,15 +56,26 @@ export default function Dashboard() {
   const {
     loading, setLoading,
     viewTask, setViewTask,
-    editTask, setEditTask,
     search, setSearch,
     sort,
     activeSectionId, setActiveSectionId,
     input, setInput,
     imageFile, setImageFile,
+    reminderDate, setReminderDate,
+    reminderTime, setReminderTime,
     workspaceId, setWorkspaceId,
     taskInputRef
   } = state;
+
+  const {
+    notifications,
+    reloadCompletionNotifications,
+    handleMarkAllRead,
+    handleDismissNotification,
+    setTaskReminder,
+    getReminderLabel,
+    getReminderDueAt,
+  } = useDashboardNotifications({tasks,workspace,userEmail,token, });
 
   // ───────── DERIVED DATA ─────────
   const derived = useDashboardDerived(tasks, sections, search, sort, activeSectionId);
@@ -75,17 +89,21 @@ export default function Dashboard() {
     setWorkspaceId,
     workspaceId,
     reloadTasks,
-    loadSections
+    loadSections,
+    reloadCompletionNotifications
   );
 
   // ───────── TASK ACTIONS ─────────
   const actions = useTaskActions({
     input, setInput,
     imageFile, setImageFile,
+    reminderDate, setReminderDate,
+    reminderTime, setReminderTime,
     activeSectionId, setActiveSectionId,
     sections, hasNoSections,
     tasks, createTask, deleteTask, reloadTasks,
-    workspace, userEmail, token, taskInputRef
+    workspace, userEmail, token, taskInputRef,
+    onTaskReminderSet: setTaskReminder,
   });
 
   // ───────── BOOT LOADING ─────────
@@ -97,6 +115,17 @@ export default function Dashboard() {
   useEffect(() => {
     setActiveSectionId(null);
   }, [workspace]);
+
+  const handleTaskReminderUpdate = useCallback(
+    (taskId: string, taskText: string, dueAt: number | null) => {
+      setTaskReminder(taskId, taskText, dueAt);
+    },
+    [setTaskReminder]
+  );
+
+  const handleAddWorkspace = useCallback((name: string, emoji: string) => {
+    addWorkspace(name, emoji);
+  }, [addWorkspace]);
 
   // ───────── RENDER ─────────
   return (
@@ -114,10 +143,15 @@ export default function Dashboard() {
           <HeaderSection
             workspace={workspace}
             setWorkspace={setWorkspace}
+            workspaceOptions={workspaceOptions}
+            onAddWorkspace={handleAddWorkspace}
             userName={userName}
             theme={theme}
             toggleTheme={toggleTheme}
             logout={logout}
+            notifications={notifications}
+            onMarkAllRead={handleMarkAllRead}
+            onDismissNotification={handleDismissNotification}
           />
 
           <StatsBar
@@ -145,6 +179,10 @@ export default function Dashboard() {
               setInput={setInput}
               imageFile={imageFile}
               setImageFile={setImageFile}
+              reminderDate={reminderDate}
+              setReminderDate={setReminderDate}
+              reminderTime={reminderTime}
+              setReminderTime={setReminderTime}
               handleAdd={actions.handleAdd}
               sectionName={activeSectionLabel ?? undefined}
             />
@@ -166,9 +204,9 @@ export default function Dashboard() {
               onTasksChanged={reloadTasks}
               onTaskDelete={actions.handleDelete}
               onTaskToggle={toggleComplete}
-              onTaskEdit={(t) => setEditTask(t)}
               onTaskView={(t) => setViewTask(t)}
               onTaskAdd={actions.handleTaskAddInSection}
+              getReminderLabel={getReminderLabel}
             />
           )}
 
@@ -179,13 +217,19 @@ export default function Dashboard() {
         open={!!viewTask}
         onOpenChange={() => setViewTask(null)}
         task={viewTask}
-      />
-
-      <EditTaskDialog
-        open={!!editTask}
-        onOpenChange={() => setEditTask(null)}
-        task={editTask}
-        onSave={actions.handleEditSave}
+        reminderDueAt={viewTask ? getReminderDueAt(viewTask.id) : null}
+        onSave={async (id, text, image, removeImage, reminderAt = null) => {
+          if (reminderAt !== null && reminderAt <= Date.now()) {
+            toast.error("Reminder time should be in future");
+            return false;
+          }
+          const ok = await actions.handleEditSave(id, text, image, removeImage);
+          if (!ok) return false;
+          handleTaskReminderUpdate(id, text, reminderAt);
+          setViewTask(null);
+          toast.success("Task updated");
+          return true;
+        }}
       />
     </>
   );

@@ -29,9 +29,9 @@ interface Props {
   onTasksChanged: () => void;
   onTaskDelete: (id: string) => void;
   onTaskToggle: (id: string) => void;
-  onTaskEdit: (task: Task) => void;
   onTaskView: (task: Task) => void;
   onTaskAdd: (sectionId: string) => void;
+  getReminderLabel?: (taskId: string) => string | null;
 }
 
 const SECTIONS_PER_PAGE = 12;
@@ -173,9 +173,9 @@ export default function KanbanBoard(props: Props) {
               onDelete={props.onDeleteSection}
               onTaskDelete={props.onTaskDelete}
               onTaskToggle={handleToggle}
-              onTaskEdit={props.onTaskEdit}
               onTaskView={props.onTaskView}
               onTaskAdd={props.onTaskAdd}
+              getReminderLabel={props.getReminderLabel}
               justCompleted={justCompleted}
             />
           ))}

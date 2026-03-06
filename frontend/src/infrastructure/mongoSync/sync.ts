@@ -1,5 +1,6 @@
 import { initDB } from "@/infrastructure/lib/idb";
 import { authHeaders } from "@/services/auth.service";
+import { mergeNotificationsFromServer } from "@/infrastructure/lib/idb";
 
 const API_BASE = "http://localhost:4000";
 
@@ -10,13 +11,17 @@ function taskSyncKey(workspaceId: string) {
 function sectionSyncKey(workspaceType: string) {
   return `lastSectionSyncedAt_${workspaceType}`;
 }
+function notificationSyncKey(workspaceType: string) {
+  return `lastNotificationSyncedAt_${workspaceType}`;
+}
 
 export function clearSyncTimestamps() {
   Object.keys(localStorage)
     .filter(
       (k) =>
         k.startsWith("lastSyncedAt_") ||
-        k.startsWith("lastSectionSyncedAt_")
+        k.startsWith("lastSectionSyncedAt_") ||
+        k.startsWith("lastNotificationSyncedAt_")
     )
     .forEach((k) => localStorage.removeItem(k));
 }
@@ -49,12 +54,13 @@ export async function pullFromServer(
 ): Promise<boolean> {
   if (!navigator.onLine) return false;
 
-  const [sectionsChanged, tasksChanged] = await Promise.all([
+  const [sectionsChanged, tasksChanged, notificationsChanged] = await Promise.all([
     pullSections(workspaceType, token, userEmail),
     pullTasks(workspaceId, workspaceType, token, userEmail),
+    pullNotifications(workspaceType, token, userEmail),
   ]);
 
-  return sectionsChanged || tasksChanged;
+  return sectionsChanged || tasksChanged || notificationsChanged;
 }
 
 // ─── Pull sections delta ──────────────────────────────────────────────────────
@@ -113,6 +119,41 @@ async function pullTasks(
 
     localStorage.setItem(taskSyncKey(workspaceId), String(syncedAt));
     return tasks.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function pullNotifications(
+  workspaceType: string,
+  token: string,
+  userEmail: string
+): Promise<boolean> {
+  const lastSyncedAt = localStorage.getItem(notificationSyncKey(workspaceType));
+  const url =
+    `${API_BASE}/notifications/sync?workspaceType=${workspaceType}` +
+    (lastSyncedAt ? `&lastSyncedAt=${lastSyncedAt}` : "");
+
+  try {
+    const res = await fetch(url, { headers: authHeaders(token) });
+    if (!res.ok) return false;
+
+    const { notifications, syncedAt }: { notifications: any[]; syncedAt: number } =
+      await res.json();
+
+    if (notifications.length > 0) {
+      await mergeNotificationsFromServer(
+        notifications.map((n) => ({
+          ...n,
+          userEmail,
+          workspaceType,
+          syncStatus: "synced",
+        }))
+      );
+    }
+
+    localStorage.setItem(notificationSyncKey(workspaceType), String(syncedAt));
+    return notifications.length > 0;
   } catch {
     return false;
   }

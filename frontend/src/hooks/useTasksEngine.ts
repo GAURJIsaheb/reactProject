@@ -25,17 +25,105 @@ import {
   fetchFromServer,
 } from "../services/task.service";
 
+export type WorkspaceOption = {
+  value: string;
+  label: string;
+  emoji: string;
+};
+
+const WORKSPACE_STORAGE_KEY = "workspace";
+const WORKSPACE_OPTIONS_STORAGE_KEY = "workspace-options";
+
+const DEFAULT_WORKSPACES: WorkspaceOption[] = [
+  { value: "personal", label: "Personal", emoji: "🪪" },
+  { value: "professional", label: "Professional", emoji: "🧑🏻‍💼" },
+];
+
+function toWorkspaceValue(name: string) {
+  return (
+    name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") || `workspace-${Date.now()}`
+  );
+}
+
+function getInitialWorkspaceOptions(): WorkspaceOption[] {
+  try {
+    const raw = localStorage.getItem(WORKSPACE_OPTIONS_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as WorkspaceOption[]) : [];
+
+    if (!Array.isArray(parsed)) return DEFAULT_WORKSPACES;
+
+    const merged = new Map<string, WorkspaceOption>();
+    for (const option of DEFAULT_WORKSPACES) merged.set(option.value, option);
+
+    for (const option of parsed) {
+      if (!option?.value || !option?.label) continue;
+      merged.set(option.value, {
+        value: option.value,
+        label: option.label,
+        emoji: option.emoji || "📁",
+      });
+    }
+
+    return [...merged.values()];
+  } catch {
+    return DEFAULT_WORKSPACES;
+  }
+}
+
 export function useTasksEngine() {
   const { userEmail, token } = useAuthStore();
 
   const [tasks, setTasks] = useState<Task[]>([]);
-
-  // Lazy initializer — avoids reading localStorage on every render pass
-  const [workspace, setWorkspace] = useState<string>(
-    () => localStorage.getItem("workspace") || "personal"
+  const [workspaceOptions, setWorkspaceOptions] = useState<WorkspaceOption[]>(
+    getInitialWorkspaceOptions
   );
 
-  // ─── Load ─────────────────────────────────────────────────────────────────────
+  const [workspace, setWorkspace] = useState<string>(
+    () => localStorage.getItem(WORKSPACE_STORAGE_KEY) || "personal"
+  );
+
+  const addWorkspace = useCallback((name: string, emoji = "📁") => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+
+    setWorkspaceOptions((prev) => {
+      const baseValue = toWorkspaceValue(trimmed);
+      let value = baseValue;
+      let suffix = 2;
+      const existingValues = new Set(prev.map((w) => w.value));
+
+      while (existingValues.has(value)) {
+        value = `${baseValue}-${suffix}`;
+        suffix += 1;
+      }
+
+      const next = [...prev, { value, label: trimmed, emoji: emoji.trim() || "📁" }];
+      setWorkspace(value);
+      return next;
+    });
+
+    return true;
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(WORKSPACE_STORAGE_KEY, workspace);
+  }, [workspace]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      WORKSPACE_OPTIONS_STORAGE_KEY,
+      JSON.stringify(workspaceOptions)
+    );
+  }, [workspaceOptions]);
+
+  useEffect(() => {
+    const exists = workspaceOptions.some((option) => option.value === workspace);
+    if (!exists) setWorkspace("personal");
+  }, [workspace, workspaceOptions]);
 
   const reloadTasks = useCallback(async () => {
     if (!userEmail) return;
@@ -43,7 +131,6 @@ export function useTasksEngine() {
     setTasks(fresh);
   }, [userEmail, workspace]);
 
-  // Single consolidated effect — prevents double loadLocalTasks call on mount
   useEffect(() => {
     if (!userEmail) return;
 
@@ -58,9 +145,8 @@ export function useTasksEngine() {
     };
 
     init();
-  }, [token, userEmail, workspace]);
+  }, [token, userEmail, workspace, reloadTasks]);
 
-  // Sync when network comes back online
   useEffect(() => {
     const handleOnline = async () => {
       if (token) {
@@ -72,64 +158,59 @@ export function useTasksEngine() {
     return () => window.removeEventListener("online", handleOnline);
   }, [token, reloadTasks]);
 
-  // ─── Create ───────────────────────────────────────────────────────────────────
-
   async function createTask(
-  text: string,
-  imageFile?: File | null,
-  sectionId?: string | null
-) {
-  if (!userEmail) throw new Error("User not authenticated");
+    text: string,
+    imageFile?: File | null,
+    sectionId?: string | null
+  ) {
+    if (!userEmail) throw new Error("User not authenticated");
 
-  const task: Task = {
-    id: crypto.randomUUID(),
-    text,
-    completed: false,
-    archived: false,
-    deleted: false,
-    deletedAt: null,
-    image: null,
-    sectionId: sectionId ?? null,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    userEmail,
-    workspaceType: workspace,
-    syncStatus: "pending",
-    version: 1,
-  };
-
-  // Pehle IDB + UI update
-  await saveLocalTask(task);
-  setTasks((prev) => [...prev, task]);
-
-  if (!token) {
-    // Offline — queue mein daalo
-    const jobId = crypto.randomUUID();
-    await queueCreate(task, userEmail, workspace, jobId);
-    return;
-  }
-
-  // Online — seedha API call, queue mat karo abhi
-  try {
-    const result = await apiCreateTask(task, token, imageFile);
-
-    const syncedTask: Task = {
-      ...task,
-      syncStatus: "synced",
-      image: result?.task?.imageUrl ?? result?.task?.image ?? null,
+    const task: Task = {
+      id: crypto.randomUUID(),
+      text,
+      completed: false,
+      archived: false,
+      deleted: false,
+      deletedAt: null,
+      image: null,
+      sectionId: sectionId ?? null,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      userEmail,
+      workspaceType: workspace,
+      syncStatus: "pending",
+      version: 1,
     };
 
-    await saveLocalTask(syncedTask);
-    setTasks((prev) =>
-      prev.map((t) => (t.id === task.id ? syncedTask : t))
-    );
-  } catch {
-    // Failed — ab queue mein daalo retry ke liye
-    const jobId = crypto.randomUUID();
-    await queueCreate(task, userEmail, workspace, jobId);
+    await saveLocalTask(task);
+    setTasks((prev) => [...prev, task]);
+
+    if (!token) {
+      const jobId = crypto.randomUUID();
+      await queueCreate(task, userEmail, workspace, jobId);
+      return task;
+    }
+
+    try {
+      const result = await apiCreateTask(task, token, imageFile);
+
+      const syncedTask: Task = {
+        ...task,
+        syncStatus: "synced",
+        image: result?.task?.imageUrl ?? result?.task?.image ?? null,
+      };
+
+      await saveLocalTask(syncedTask);
+      setTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? syncedTask : t))
+      );
+      return syncedTask;
+    } catch {
+      const jobId = crypto.randomUUID();
+      await queueCreate(task, userEmail, workspace, jobId);
+      return task;
+    }
   }
-}
-  // ─── Toggle Complete ──────────────────────────────────────────────────────────
 
   async function toggleComplete(id: string) {
     if (!userEmail) return;
@@ -169,19 +250,15 @@ export function useTasksEngine() {
         prev.map((t) => (t.id === id ? { ...t, syncStatus: "synced" } : t))
       );
     } catch {
-      // Offline — queued for retry
+      // queued for retry
     }
   }
-
-  // ─── Delete ───────────────────────────────────────────────────────────────────
 
   async function deleteTask(id: string) {
     if (!userEmail) return;
 
     await deleteLocalTask(id);
 
-    // Capture jobId so we can clean it up after a successful API call,
-    // preventing a spurious 404 retry from syncQueue
     const jobId = await queueDelete(id, userEmail, workspace);
 
     setTasks((prev) => prev.filter((t) => t.id !== id));
@@ -192,11 +269,9 @@ export function useTasksEngine() {
       await apiDeleteTask(id, token);
       await removeQueueJob(jobId);
     } catch {
-      // Offline — queued for retry
+      // queued for retry
     }
   }
-
-  // ─── Edit ─────────────────────────────────────────────────────────────────────
 
   async function editTask(id: string, newText: string, newImage?: string | null) {
     if (!userEmail) return;
@@ -238,11 +313,9 @@ export function useTasksEngine() {
         prev.map((t) => (t.id === id ? { ...t, syncStatus: "synced" } : t))
       );
     } catch {
-      // Offline — queued for retry
+      // queued for retry
     }
   }
-
-  // ─── Move to Section ──────────────────────────────────────────────────────────
 
   async function moveTaskToSection(id: string, sectionId: string | null) {
     if (!userEmail) return;
@@ -278,7 +351,7 @@ export function useTasksEngine() {
         prev.map((t) => (t.id === id ? { ...t, syncStatus: "synced" } : t))
       );
     } catch {
-      // Offline — queued for retry
+      // queued for retry
     }
   }
 
@@ -286,6 +359,8 @@ export function useTasksEngine() {
     tasks,
     workspace,
     setWorkspace,
+    workspaceOptions,
+    addWorkspace,
     createTask,
     toggleComplete,
     deleteTask,

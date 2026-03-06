@@ -32,9 +32,9 @@ interface KanbanColumnProps {
   onDelete: (id: string) => void;
   onTaskDelete: (id: string) => void;
   onTaskToggle: (id: string, e?: React.MouseEvent) => void;
-  onTaskEdit: (task: Task) => void;
   onTaskView: (task: Task) => void;
   onTaskAdd: (sectionId: string) => void;
+  getReminderLabel?: (taskId: string) => string | null;
   justCompleted?: Set<string>;
   dragHandleProps?: React.HTMLAttributes<HTMLElement>;
 }
@@ -78,9 +78,9 @@ export default function KanbanColumn({
   onDelete,
   onTaskDelete,
   onTaskToggle,
-  onTaskEdit,
   onTaskView,
   onTaskAdd,
+  getReminderLabel,
   justCompleted,
   dragHandleProps,
 }: KanbanColumnProps) {
@@ -262,8 +262,8 @@ export default function KanbanColumn({
               index={idx}
               onDelete={onTaskDelete}
               onToggle={onTaskToggle}
-              onEdit={onTaskEdit}
               onView={onTaskView}
+              reminderLabel={getReminderLabel?.(task.id) ?? null}
               isJustCompleted={justCompleted?.has(task.id) ?? false}
             />
           ))}
@@ -304,16 +304,16 @@ function SortableTaskCard({
   index,
   onDelete,
   onToggle,
-  onEdit,
   onView,
+  reminderLabel,
   isJustCompleted,
 }: {
   task: Task;
   index: number;
   onDelete: (id: string) => void;
   onToggle: (id: string, e?: React.MouseEvent) => void;
-  onEdit: (task: Task) => void;
   onView: (task: Task) => void;
+  reminderLabel: string | null;
   isJustCompleted: boolean;
 }) {
   const {
@@ -348,8 +348,8 @@ function SortableTaskCard({
         index={index}
         onDelete={onDelete}
         onToggle={onToggle}
-        onEdit={onEdit}
         onView={onView}
+        reminderLabel={reminderLabel}
         isDragging={isDragging}
         isJustCompleted={isJustCompleted}
       />

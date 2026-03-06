@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const workspaceSchema = new mongoose.Schema({
   workspaceId: { type: String, required: true, unique: true },
   owner:       { type: mongoose.Schema.Types.ObjectId, ref: 'users', required: true },
-  type:        { type: String, enum: ['personal', 'professional'], required: true },
+  type:        { type: String, required: true, trim: true },
   members:     [{ type: mongoose.Schema.Types.ObjectId, ref: 'users' }],
   createdAt:   { type: Number, default: () => Date.now() },
   updatedAt:   { type: Number, default: () => Date.now() },

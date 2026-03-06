@@ -1,36 +1,33 @@
 import { Anchor, Moon, Sun, LogOut } from "lucide-react";
-
-type Props = {
-  workspace: string;
-  setWorkspace: (v: string) => void;
-  userName?: string | null;
-  theme: string;
-  toggleTheme: () => void;
-  logout: () => void;
-};
+import WorkspaceSelector from "./WorkspaceSelector";
+import NotificationsBell from "./NotificationsBell";
+import type { HeaderProps } from "./types";
 
 export default function HeaderSection({
   workspace,
   setWorkspace,
+  workspaceOptions,
+  onAddWorkspace,
   userName,
   theme,
   toggleTheme,
   logout,
-}: Props) {
+  notifications,
+  onMarkAllRead,
+  onDismissNotification,
+}: HeaderProps) {
   return (
     <header
       className="flex items-center justify-between flex-wrap gap-3 px-5 py-4 mb-7
       bg-white/5 border border-white/10 rounded-2xl backdrop-blur-xl
       shadow-[0_0_0_1px_rgba(99,102,241,0.1),0_20px_60px_rgba(0,0,0,0.4)]
-      relative overflow-hidden"
+      relative z-10"
     >
-      {/* Top shimmer line */}
-      <div className="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-indigo-500/70 to-transparent" />
+      <div className="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-indigo-500/70 to-transparent rounded-t-2xl" />
 
-      {/* Left — logo + workspace switcher */}
       <div className="flex items-center gap-2">
         <div
-          className="w-8.5 h-8.5 rounded-xl flex items-center justify-center text-white
+          className="w-8 h-8 rounded-xl flex items-center justify-center text-white
           bg-linear-to-br from-indigo-500 to-pink-500 shadow-[0_0_20px_rgba(99,102,241,0.5)]"
         >
           <Anchor size={16} />
@@ -44,38 +41,36 @@ export default function HeaderSection({
           FlowTask
         </span>
 
-        <select
-          value={workspace}
-          onChange={(e) => setWorkspace(e.target.value)}
-          className="px-2 py-2 text-[13px] font-semibold rounded-xl
-          bg-background border border-border text-foreground outline-none
-          hover:bg-muted hover:border-border"
-        >
-          <option value="personal">🧑 Personal</option>
-          <option value="professional">💼 Professional</option>
-        </select>
+        <WorkspaceSelector
+          workspace={workspace}
+          setWorkspace={setWorkspace}
+          workspaceOptions={workspaceOptions}
+          onAddWorkspace={onAddWorkspace}
+          theme={theme}
+        />
       </div>
 
-      {/* Right — greeting + theme + logout */}
       <div className="flex items-center gap-2">
         {userName && (
-          <div
-            className="px-3 py-1.5 rounded-full text-[16px] max-w-40 truncate
-            text-foreground font-mono"
-          >
+          <div className="px-3 py-1.5 rounded-full text-[16px] max-w-40 truncate text-foreground font-mono">
             Hello {userName}
           </div>
         )}
 
         <button
           onClick={toggleTheme}
-          className="w-9.5 h-9.5 rounded-xl flex items-center justify-center
+          className="w-9 h-9 rounded-xl flex items-center justify-center
           bg-background border border-border text-foreground
           hover:bg-white/20 hover:scale-110 transition"
-          aria-label="Toggle theme"
         >
           {theme === "dark" ? <Moon size={15} /> : <Sun size={15} />}
         </button>
+
+        <NotificationsBell
+          notifications={notifications}
+          onMarkAllRead={onMarkAllRead}
+          onDismissNotification={onDismissNotification}
+        />
 
         <button
           onClick={logout}

@@ -23,7 +23,7 @@ export default function KanbanAddSection({
         <div
           className="
             flex flex-col gap-3 p-4 rounded-2xl
-            bg-[#161620] border border-violet-500/25
+            bg-background border border-border
             shadow-[0_0_24px_rgba(139,92,246,0.08)]
             animate-in fade-in slide-in-from-top-2 duration-200
           "
