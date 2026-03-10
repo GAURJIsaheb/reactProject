@@ -7,6 +7,7 @@ import { useAuthStore } from "./zustand/authStore";
 import AdminDashboard from "./Admin/adminDashboard";
 import ResetPassword from "./pages/ResetPassword/ResetPassword";
 import ForgotPassword from "./pages/ForgotPassword/ForgotPassword";
+import InviteAccept from "./pages/InviteAccept/InviteAccept";
 
 
 
@@ -88,6 +89,8 @@ function App() {
         <Route path="*" element={
           <Navigate to={!token ? "/login" : isAdmin ? "/admin" : "/dashboard"} />
         } />
+
+        <Route path="/invite/accept" element={<InviteAccept />} />
       </Routes>
     </BrowserRouter>
   );

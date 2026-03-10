@@ -58,7 +58,13 @@ export default function Login() {
         data.user.userId
       );
 
+  const pendingInvite = sessionStorage.getItem("pendingInviteUrl");
+if (pendingInvite) {
+  sessionStorage.removeItem("pendingInviteUrl");
+  window.location.href = pendingInvite;
+} else {
   window.location.reload();
+}
 } catch (err: any) {
       setError(err.message || "Login failed. Please try again.");
     } finally {

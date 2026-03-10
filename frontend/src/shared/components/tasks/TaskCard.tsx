@@ -1,6 +1,8 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Trash2, Check } from "lucide-react";
 import type { Task } from "@/shared/types/task";
+import { useAuthStore } from "@/zustand/authStore";
+import { apiFetchTaskImageUrl } from "@/services/task.service";
 
 const CARD_PALETTES = [
   {
@@ -71,7 +73,7 @@ interface Props {
   dragHandleProps?: React.HTMLAttributes<HTMLElement>;
 }
 
-export default function TaskCard({
+function TaskCard({
   task,
   index,
   onDelete,
@@ -81,10 +83,17 @@ export default function TaskCard({
   isJustCompleted = false,
   reminderLabel,
 }: Props) {
+  const { token } = useAuthStore();
   const palette = getPalette(index);
   const isCompleted = task.completed;
   const hasImage = Boolean(task.imageUrl || task.image);
   const [showImage, setShowImage] = useState(false);
+  const [loadingImage, setLoadingImage] = useState(false);
+  const [resolvedImageUrl, setResolvedImageUrl] = useState<string | null>(
+    (task.imageUrl && /^https?:\/\//.test(task.imageUrl))
+      ? task.imageUrl
+      : (task.image && /^https?:\/\//.test(task.image) ? task.image : null)
+  );
   const { title, description } = useMemo(() => {
     const raw = (task.text ?? "").trim();
     const lines = raw
@@ -203,7 +212,26 @@ export default function TaskCard({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setShowImage((prev) => !prev);
+                const next = !showImage;
+                setShowImage(next);
+
+                if (
+                  next &&
+                  !resolvedImageUrl &&
+                  task.image &&
+                  token &&
+                  !loadingImage
+                ) {
+                  setLoadingImage(true);
+                  apiFetchTaskImageUrl(task.id, token)
+                    .then((data) => {
+                      if (data.imageUrl) setResolvedImageUrl(data.imageUrl);
+                    })
+                    .catch(() => {
+                      // non-blocking UI action
+                    })
+                    .finally(() => setLoadingImage(false));
+                }
               }}
               className={`text-[11px] font-semibold underline underline-offset-2 ${
                 isCompleted ? "text-gray-500" : palette.sub
@@ -214,13 +242,19 @@ export default function TaskCard({
           </div>
           {showImage && (
             <div className={`flex justify-center ${isCompleted ? "opacity-60" : ""}`}>
-              <img
-                src={task.imageUrl ?? task.image!}
-                alt="attachment"
-                loading="lazy"
-                decoding="async"
-                className="w-[75%] aspect-video object-cover rounded-sm shadow-sm"
-              />
+              {resolvedImageUrl ? (
+                <img
+                  src={resolvedImageUrl}
+                  alt="attachment"
+                  loading="lazy"
+                  decoding="async"
+                  className="w-[75%] aspect-video object-cover rounded-sm shadow-sm"
+                />
+              ) : (
+                <div className="text-[11px] text-muted-foreground py-2">
+                  {loadingImage ? "Loading image..." : "Image unavailable"}
+                </div>
+              )}
             </div>
           )}
         </>
@@ -280,3 +314,5 @@ export default function TaskCard({
     </div>
   );
 }
+
+export default memo(TaskCard);

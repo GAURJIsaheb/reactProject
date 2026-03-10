@@ -40,6 +40,10 @@ export default function Dashboard() {
     toggleComplete,
     deleteTask,
     reloadTasks,
+    // ── collab additions ──
+    currentWsId,
+    sendWs,
+    registerSectionWsHandler,
   } = useTasksEngine();
 
   const {
@@ -49,7 +53,18 @@ export default function Dashboard() {
     deleteSection,
     reorderSections,
     loadSections,
-  } = useSectionsEngine(workspace);
+    // ── collab addition ──
+    handleWsSection,
+  } = useSectionsEngine({
+    workspaceType: workspace,
+    workspaceId:   currentWsId,   // null for personal/professional
+    sendWs,
+  });
+
+  // Register section WS handler so useTasksEngine routes SECTION_* events here
+  useEffect(() => {
+    registerSectionWsHandler(handleWsSection);
+  }, [registerSectionWsHandler, handleWsSection]);
 
   // ───────── LOCAL DASHBOARD STATE ─────────
   const state = useDashboardState();
@@ -75,11 +90,11 @@ export default function Dashboard() {
     setTaskReminder,
     getReminderLabel,
     getReminderDueAt,
-  } = useDashboardNotifications({tasks,workspace,userEmail,token, });
+  } = useDashboardNotifications({ tasks, workspace, userEmail, token });
 
   // ───────── DERIVED DATA ─────────
   const derived = useDashboardDerived(tasks, sections, search, sort, activeSectionId);
-  const { activeTasks, completedTasks, hasNoSections, sortedTasks , activeSectionLabel} = derived;
+  const { activeTasks, completedTasks, hasNoSections, sortedTasks, activeSectionLabel } = derived;
 
   // ───────── SYNC ENGINE ─────────
   useWorkspaceSync(

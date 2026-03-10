@@ -8,6 +8,7 @@ import { apiUpdateTask } from "@/services/task.service";
 import type { Task } from "@/shared/types/task";
 import taskAddSound from "@/assests/taskadd.wav";
 import taskDeleteSound from "@/assests/deleteTask.wav";
+
 type Props = {
   input: string;
   setInput: (v: string) => void;
@@ -27,7 +28,8 @@ type Props = {
 
   tasks: Task[];
 
-  createTask: (text: string, image: File | null, sectionId: string) => Promise<Task>;
+  // ← return type is now Task | null (null when collab + offline)
+  createTask: (text: string, image: File | null, sectionId: string) => Promise<Task | null>;
   onTaskReminderSet: (taskId: string, taskText: string, dueAt: number | null) => void;
   deleteTask: (id: string) => void;
   reloadTasks: () => Promise<void>;
@@ -39,22 +41,12 @@ type Props = {
   taskInputRef: React.RefObject<HTMLInputElement | null>;
 };
 
-
-
 function playSuccessSound() {
-  try {
-    const audio = new Audio(taskAddSound);
-    audio.play();
-  } catch {// Audio not available — silently skip
-  }
+  try { new Audio(taskAddSound).play(); } catch { /* silent */ }
 }
 
 function deleteTaskSound() {
-  try {
-    const audio = new Audio(taskDeleteSound);
-    audio.play();
-  } catch {// Audio not available — silently skip
-  }
+  try { new Audio(taskDeleteSound).play(); } catch { /* silent */ }
 }
 
 export function useTaskActions({
@@ -83,13 +75,11 @@ export function useTaskActions({
   const resolveReminderAt = useCallback((): number | null => {
     if (!reminderDate && !reminderTime) return null;
     if (!reminderDate || !reminderTime) return NaN;
-
     const dueAt = new Date(`${reminderDate}T${reminderTime}:00`).getTime();
     return Number.isFinite(dueAt) ? dueAt : NaN;
   }, [reminderDate, reminderTime]);
 
   // ─── ADD TASK ─────────────────────────────────────────────
-
   const handleAdd = useCallback(async () => {
     const trimmed = input.trim();
     if (!trimmed || hasNoSections) return;
@@ -97,57 +87,34 @@ export function useTaskActions({
     const targetSectionId = activeSectionId ?? sections[0]?.id ?? null;
     if (!targetSectionId) return;
 
-    // Pass raw File — NO base64 conversion
-    const fileToUpload = imageFile ?? null;
     const reminderAt = resolveReminderAt();
-
-    if (Number.isNaN(reminderAt)) {
-      toast.error("Reminder date and time both required");
-      return;
-    }
-    if (reminderAt !== null && reminderAt <= Date.now()) {
-      toast.error("Reminder time should be in future");
-      return;
-    }
+    if (Number.isNaN(reminderAt)) { toast.error("Reminder date and time both required"); return; }
+    if (reminderAt !== null && reminderAt <= Date.now()) { toast.error("Reminder time should be in future"); return; }
 
     setInput("");
     setImageFile(null);
     setReminderDate("");
     setReminderTime("");
 
-    const createdTask = await createTask(trimmed, fileToUpload, targetSectionId);
+    const createdTask = await createTask(trimmed, imageFile ?? null, targetSectionId);
+    // createdTask is null when collab workspace + offline — guard before using it
+    if (!createdTask) return;
+
     onTaskReminderSet(createdTask.id, trimmed, reminderAt);
-
     playSuccessSound();
-
-    toast.success("✨ Task added!", {
-      description: `"${trimmed}"`,
-      duration: 2500,
-    });
+    toast.success("✨ Task added!", { description: `"${trimmed}"`, duration: 2500 });
 
   }, [
-    input,
-    imageFile,
-    activeSectionId,
-    sections,
-    hasNoSections,
-    createTask,
-    reminderDate,
-    reminderTime,
-    resolveReminderAt,
-    setReminderDate,
-    setReminderTime,
-    onTaskReminderSet,
+    input, imageFile, activeSectionId, sections, hasNoSections,
+    createTask, reminderDate, reminderTime, resolveReminderAt,
+    setInput, setImageFile, setReminderDate, setReminderTime, onTaskReminderSet,
   ]);
 
   // ─── DELETE TASK ──────────────────────────────────────────
-
   const handleDelete = useCallback((id: string) => {
     const task = tasks.find((t) => t.id === id);
     deleteTask(id);
-
     deleteTaskSound();
-
     toast.success("🧹 Task deleted", {
       description: task ? `"${task.text}"` : "Task removed",
       duration: 2500,
@@ -155,7 +122,6 @@ export function useTaskActions({
   }, [tasks, deleteTask]);
 
   // ─── EDIT SAVE ────────────────────────────────────────────
-
   const handleEditSave = useCallback(
     async (
       id: string,
@@ -165,20 +131,15 @@ export function useTaskActions({
     ): Promise<boolean> => {
       if (!userEmail) return false;
 
-      // IDB optimistic update — clear image if removing, keep existing if no change
       const idbUpdate: any = {
-        id,
-        text,
-        userEmail,
+        id, text, userEmail,
         workspaceType: workspace,
         updatedAt: Date.now(),
         dirty: true,
       };
       if (removeImage) idbUpdate.image = null;
-
       await addTask(idbUpdate);
 
-      // Queue for offline retry
       await upsertQueue({
         id: uuidv4(),
         action: "update",
@@ -190,19 +151,14 @@ export function useTaskActions({
         nextRetry: Date.now(),
       });
 
-      // Online push via FormData
       try {
         if (token) {
           const result = await apiUpdateTask(id, { text }, token, imageFile, removeImage);
-
-          // Update IDB with fresh signed URL from server
           if (result?.task?.imageUrl) {
             await addTask({ id, image: result.task.imageUrl });
           }
         }
-      } catch {
-        // offline — queue handles it
-      }
+      } catch { /* offline — queue handles it */ }
 
       await reloadTasks();
       return true;
@@ -211,22 +167,15 @@ export function useTaskActions({
   );
 
   // ─── CLICK +ADD INSIDE COLUMN ─────────────────────────────
-
   const handleTaskAddInSection = useCallback((sectionId: string) => {
     setActiveSectionId(sectionId);
-    requestAnimationFrame(() => {
-      taskInputRef.current?.focus();
-    });
-  }, []);
+    requestAnimationFrame(() => { taskInputRef.current?.focus(); });
+  }, [setActiveSectionId, taskInputRef]);
 
-  const handleClearSection = useCallback(() => {
-    setActiveSectionId(null);
-  }, []);
+  const handleClearSection = useCallback(() => { setActiveSectionId(null); }, [setActiveSectionId]);
 
   const handleCreateFirstSection = useCallback(
-    (createSection: (t: string) => void) => {
-      createSection("My Tasks");
-    },
+    (createSection: (t: string) => void) => { createSection("My Tasks"); },
     []
   );
 

@@ -1,13 +1,14 @@
-import { createServer } from './indexSetup.js';
-import { registerRoutes } from './routes/index.js';
-import { connectDB } from './mongo/mongo.js';
+import { createServer }    from './indexSetup.js';
+import { registerRoutes }   from './routes/index.js';
+import { connectDB }        from './mongo/mongo.js';
 import { registerCronJobs } from './cron/cleanupJobs.js';
-import { startConsumer } from './sqs/sqsConsumer.js';
+import { startConsumer }    from './sqs/sqsConsumer.js';
+import { CollabWsServer }   from './websocket/wsServer.js';      
 import path from 'path';
 
 const { app, clientPath } = createServer();
 
-registerRoutes(app); //register routes
+registerRoutes(app);
 
 app.get('/{*splat}', (req, res) => {
   res.sendFile(path.join(clientPath, 'index.html'));
@@ -21,46 +22,20 @@ app.use((err, req, res, next) => {
 async function start() {
   await connectDB();
   registerCronJobs();
-  startConsumer();//email
-  app.listen(4000, () => console.log('Server on 4000 + Mongo'));
+  startConsumer();
+
+  // Use http.createServer so WS and HTTP share the same port
+  const { createServer: createHttpServer } = await import('http');
+  const httpServer = createHttpServer(app);
+
+  // Attach WebSocket server
+  const wsServer = new CollabWsServer(httpServer);
+  wsServer.startHeartbeat();
+  app.set('wsServer', wsServer);                               
+
+  httpServer.listen(4000, () =>
+    console.log('Server on 4000 + Mongo + WebSocket')
+  );
 }
 
 start();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
-0.0.0.0 means:
-Accept connections from anywhere that can reach this machine.”
-
-That includes:
-
-Other devices on your WiFi
-
-Docker containers
- */

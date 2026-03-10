@@ -43,7 +43,7 @@ export async function fetchFromServer(
       await addTask({
         id,
         text: t.text,
-        image: t.imageUrl ?? t.image ?? null, // store signed URL locally
+        image: t.imageUrl ?? t.image ?? null, // signed URL if cached, otherwise S3 key
         completed: t.completed,
         archived: t.archived,
         deleted: t.deleted,
@@ -112,4 +112,13 @@ export async function apiDeleteTask(id: string, token: string) {
   });
 
   if (!res.ok) throw new Error("delete failed");
+}
+
+export async function apiFetchTaskImageUrl(id: string, token: string) {
+  const res = await fetch(`${API_BASE}/tasks/${id}/image-url`, {
+    headers: authHeaders(token),
+  });
+
+  if (!res.ok) throw new Error("image url fetch failed");
+  return res.json() as Promise<{ imageUrl: string | null; imageUrlExpiry: number | null }>;
 }

@@ -11,10 +11,6 @@ import { upsertTaskCompletedNotification } from './notifications.controller.js';
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 // Attach signed URLs to an array of lean task objects
-async function attachSignedUrls(tasks) {
-  return Promise.all(tasks.map(t => resolveImageUrl(t, Task)));
-}
-
 function normalizeWorkspaceType(workspaceType) {
   return String(workspaceType ?? 'personal').trim().toLowerCase() || 'personal';
 }
@@ -152,10 +148,31 @@ export const getAllTasks = async (req, res) => {
   const ws = await ensureWorkspace(userId, normalizedWorkspaceType);
   if (!ws) return res.json([]);
 
-  const tasks        = await Task.find({ workspaceId: ws.workspaceId, deleted: false }).lean();
-  const tasksWithUrl = await attachSignedUrls(tasks);
+  const tasks = await Task.find(
+    { workspaceId: ws.workspaceId, deleted: false },
+    {
+      _id: 0,
+      taskId: 1,
+      workspaceId: 1,
+      sectionId: 1,
+      text: 1,
+      image: 1,
+      imageUrl: 1,
+      imageUrlExpiry: 1,
+      reminderAt: 1,
+      completed: 1,
+      archived: 1,
+      deleted: 1,
+      deletedAt: 1,
+      createdBy: 1,
+      workspaceType: 1,
+      version: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    }
+  ).lean();
 
-  res.json(tasksWithUrl);
+  res.json(tasks);
 };
 
 // ─── Update ───────────────────────────────────────────────────────────────────
@@ -319,14 +336,54 @@ export const getWorkspaceId = async (req, res) => {
   res.json({ workspaceId: ws.workspaceId });
 };
 
+export const getTaskImageUrl = async (req, res) => {
+  const { id: taskId } = req.params;
+  const { userId } = req.user;
+
+  const task = await Task.findOne(
+    { taskId, createdBy: userId, deleted: false },
+    { _id: 0, taskId: 1, image: 1, imageUrl: 1, imageUrlExpiry: 1 }
+  ).lean();
+
+  if (!task) return res.status(404).json({ error: 'Task not found' });
+  if (!task.image) return res.json({ imageUrl: null, imageUrlExpiry: null });
+
+  const resolved = await resolveImageUrl(task, Task);
+  return res.json({
+    imageUrl: resolved.imageUrl ?? null,
+    imageUrlExpiry: resolved.imageUrlExpiry ?? null,
+  });
+};
+
 export const syncTasks = async (req, res) => {
   const { lastSyncedAt, workspaceId } = req.query;
   const since = lastSyncedAt ? Number(lastSyncedAt) : 0;
 
-  const tasks        = await Task.find({ workspaceId, updatedAt: { $gt: since } }).lean();
-  const tasksWithUrl = await attachSignedUrls(tasks);
+  const tasks = await Task.find(
+    { workspaceId, updatedAt: { $gt: since } },
+    {
+      _id: 0,
+      taskId: 1,
+      workspaceId: 1,
+      sectionId: 1,
+      text: 1,
+      image: 1,
+      imageUrl: 1,
+      imageUrlExpiry: 1,
+      reminderAt: 1,
+      completed: 1,
+      archived: 1,
+      deleted: 1,
+      deletedAt: 1,
+      createdBy: 1,
+      workspaceType: 1,
+      version: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    }
+  ).lean();
 
-  const mapped = tasksWithUrl.map(t => ({ ...t, id: t.taskId }));
+  const mapped = tasks.map(t => ({ ...t, id: t.taskId }));
 
   res.json({ tasks: mapped, syncedAt: Date.now() });
 };

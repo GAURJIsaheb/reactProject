@@ -6,11 +6,9 @@ import { signToken } from "./jwt.js";
 import { User }      from '../models/User.model.js';
 import { Workspace } from '../models/Workspace.model.js';
 
-
 const router = express.Router();
 
-
-// SIGNUP--->with Transaction
+/* ── SIGNUP ── */
 router.post("/signup", async (req, res) => {
   const { name, email, password } = req.body;
   if (!email || !name || !password)
@@ -21,7 +19,7 @@ router.post("/signup", async (req, res) => {
 
   const hashed = await bcrypt.hash(password, 10);
 
-  const session = await User.startSession();//container of transaction
+  const session = await User.startSession();
   let user;
 
   try {
@@ -32,10 +30,23 @@ router.post("/signup", async (req, res) => {
       );
       user = createdUsers[0];
 
+      // Give every new user their 2 default workspaces with proper emojis
       await Workspace.insertMany(
         [
-          { workspaceId: crypto.randomUUID(), type: 'personal',     owner: user._id, members: [user._id] },
-          { workspaceId: crypto.randomUUID(), type: 'professional', owner: user._id, members: [user._id] },
+          {
+            workspaceId: crypto.randomUUID(),
+            type:        'personal',
+            emoji:       '🪪',
+            owner:       user._id,
+            members:     [user._id],
+          },
+          {
+            workspaceId: crypto.randomUUID(),
+            type:        'professional',
+            emoji:       '🧑🏻‍💼',
+            owner:       user._id,
+            members:     [user._id],
+          },
         ],
         { session }
       );
@@ -44,13 +55,10 @@ router.post("/signup", async (req, res) => {
     await session.endSession();
   }
 
-  if (!user) {
-    return res.status(500).json({ error: "Signup failed" });
-  }
+  if (!user) return res.status(500).json({ error: "Signup failed" });
 
   const userId = user._id.toString();
-
-  const token = signToken({ email, name, userId });
+  const token  = signToken({ email, name, userId });
   res.json({ token, user: { email, name, userId } });
 });
 
@@ -63,7 +71,7 @@ router.post(
       if (!user)
         return res.status(401).json({ error: info?.message || "Login failed" });
 
-      const token = signToken(user); 
+      const token = signToken(user);
       return res.json({ token, user });
     })(req, res, next);
   }
@@ -73,13 +81,10 @@ router.post(
 router.get(
   "/me",
   passport.authenticate("jwt", { session: false }),
-  (req, res) => {
-    res.json({ user: req.user });
-  }
+  (req, res) => res.json({ user: req.user })
 );
 
-
-
+/* ── ROLE ── */
 router.get(
   "/role",
   passport.authenticate("jwt", { session: false }),

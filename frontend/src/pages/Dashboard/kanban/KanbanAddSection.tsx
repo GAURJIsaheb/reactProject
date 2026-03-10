@@ -45,7 +45,7 @@ export default function KanbanAddSection({
               if (e.key === "Escape") { setTitle(""); setAdding(false); }
             }}
             className="
-              w-full bg-white/4 text-sm text-slate-200
+              w-full bg-white/4 text-sm text-foreground
               placeholder-slate-600 outline-none
               border border-white/[0.07] focus:border-violet-500/40
               rounded-xl px-3 py-2 transition-all duration-200

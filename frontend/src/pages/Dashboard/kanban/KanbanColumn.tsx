@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -38,6 +38,8 @@ interface KanbanColumnProps {
   justCompleted?: Set<string>;
   dragHandleProps?: React.HTMLAttributes<HTMLElement>;
 }
+
+const TASKS_PAGE_SIZE = 120;
 
 // ─── SortableColumn wrapper ───────────────────────────────────────────────────
 
@@ -87,7 +89,12 @@ export default function KanbanColumn({
   const [editing, setEditing] = useState(false);
   const [titleInput, setTitleInput] = useState(section.title);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(TASKS_PAGE_SIZE);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setVisibleCount(TASKS_PAGE_SIZE);
+  }, [section.id]);
 
   const a = COLUMN_ACCENTS[columnIndex % COLUMN_ACCENTS.length];
 
@@ -96,7 +103,8 @@ export default function KanbanColumn({
     data: { type: "column", sectionId: section.id },
   });
 
-  const taskIds = tasks.map((t) => t.id);
+  const visibleTasks = tasks.slice(0, visibleCount);
+  const taskIds = visibleTasks.map((t) => t.id);
   const completedCount = tasks.filter(t => t.completed).length;
   const progress = tasks.length > 0 ? (completedCount / tasks.length) * 100 : 0;
 
@@ -255,7 +263,7 @@ export default function KanbanColumn({
         data-over={isOver ? "true" : undefined}
       >
         <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
-          {tasks.map((task, idx) => (
+          {visibleTasks.map((task, idx) => (
             <SortableTaskCard
               key={task.id}
               task={task}
@@ -268,6 +276,16 @@ export default function KanbanColumn({
             />
           ))}
         </SortableContext>
+
+        {tasks.length > visibleTasks.length && (
+          <button
+            type="button"
+            onClick={() => setVisibleCount((prev) => prev + TASKS_PAGE_SIZE)}
+            className="rounded-lg border px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-black/5"
+          >
+            Show more ({tasks.length - visibleTasks.length} left)
+          </button>
+        )}
 
         {tasks.length === 0 && !isOver && (
           <div className="flex-1 flex flex-col items-center justify-center min-h-28 gap-2">

@@ -1,101 +1,120 @@
 import { Section } from "../models/Section.model.js";
-import { Task } from "../models/Task.model.js";
+import { Task }    from "../models/Task.model.js";
 
-/* GET /sections/sync*/
-export async function syncSections(req, res) {
-  const { workspaceType, lastSyncedAt } = req.query;
+// Build a Mongoose filter depending on whether this is a collab workspace.
+// Collab → filter by workspaceId (any member can touch it).
+// Personal → filter by owner + workspaceType (original behaviour, unchanged).
+function wsFilter(req, extra = {}) {
+  const { workspaceType, workspaceId } = { ...req.query, ...req.body };
   const { userId } = req.user;
+  if (workspaceId) return { workspaceId, ...extra };
+  return { owner: userId, workspaceType: workspaceType ?? "personal", ...extra };
+}
 
-  const since = lastSyncedAt ? Number(lastSyncedAt) : 0;
+/* GET /sections/sync ------------------------------------------------------- */
+export async function syncSections(req, res) {
+  const { lastSyncedAt } = req.query;
+  const since  = lastSyncedAt ? Number(lastSyncedAt) : 0;
+  const filter = wsFilter(req, { updatedAt: { $gt: since } });
 
-  const sections = await Section.find({//using this indexing:sectionSchema.index({ owner: 1, workspaceType: 1, order: 1 });
-    owner: userId,
-    workspaceType: workspaceType ?? "personal",
-    updatedAt: { $gt: since },
-  })
-    .sort({ order: 1 })
-    .lean();
-
-  // Map sectionId → id (for IndexedDB keyPath compatibility)
-  const mapped = sections.map((s) => ({
-    ...s,
-    id: s.sectionId,
-  }));
-
+  const sections = await Section.find(filter).sort({ order: 1 }).lean();
   return res.json({
-    sections: mapped,
+    sections: sections.map((s) => ({ ...s, id: s.sectionId })),
     syncedAt: Date.now(),
   });
 }
 
-/* GET /sections*/
+/* GET /sections ------------------------------------------------------------ */
 export async function getSections(req, res) {
-  const { workspaceType } = req.query;
-  const { userId } = req.user;
-
-  const sections = await Section.find({
-    owner: userId,
-    workspaceType: workspaceType ?? "personal",
-  })
-    .sort({ order: 1 })
-    .lean();
-
+  const filter   = wsFilter(req, { deleted: { $ne: true } });
+  const sections = await Section.find(filter).sort({ order: 1 }).lean();
   return res.json(sections);
 }
 
-/*POST /sections */
+/* POST /sections ----------------------------------------------------------- */
 export async function createSection(req, res) {
-  const { id, title, workspaceType, order } = req.body;
+  const { id, title, workspaceType, workspaceId, order } = req.body;
   const { userId } = req.user;
 
-  if (!id || !title) {
-    return res.status(400).json({ error: "id and title required" });
-  }
+  if (!id || !title) return res.status(400).json({ error: "id and title required" });
 
   const section = await Section.create({
-    sectionId: id,
-    owner: userId,
+    _id:           id,
+    sectionId:     id,
+    owner:         userId,
     workspaceType: workspaceType ?? "personal",
+    workspaceId:   workspaceId ?? null,
     title,
-    order: order ?? 0,
+    order:         order ?? 0,
   });
+
+  // Broadcast to collab peers so they see the new section in real-time
+  if (workspaceId) {
+    req.app.get("wsServer")?.broadcastToWorkspace(workspaceId, {
+      type:       "SECTION_CREATE",
+      workspaceId,
+      section:    { ...section.toObject(), id: section.sectionId },
+    });
+  }
 
   return res.json({ ok: true, section });
 }
 
-/* PATCH /sections/:id*/
+/* PATCH /sections/:id ------------------------------------------------------ */
 export async function updateSection(req, res) {
-  const { id } = req.params;
-  const { title, order } = req.body;
-  const { userId } = req.user;
+  const { id }                        = req.params;
+  const { title, order, workspaceId } = req.body;
+  const { userId }                    = req.user;
 
-  const update = {
-    updatedAt: Date.now(),
-  };
+  const filter = workspaceId
+    ? { sectionId: id, workspaceId }
+    : { sectionId: id, owner: userId };
 
+  const update = { updatedAt: Date.now() };
   if (title !== undefined) update.title = title;
   if (order !== undefined) update.order = order;
 
-  await Section.updateOne(
-    { sectionId: id, owner: userId },
-    { $set: update }
-  );
+  const updated = await Section
+    .findOneAndUpdate(filter, { $set: update }, { new: true })
+    .lean();
+
+  if (workspaceId && updated) {
+    req.app.get("wsServer")?.broadcastToWorkspace(workspaceId, {
+      type:       "SECTION_UPDATE",
+      workspaceId,
+      section:    { ...updated, id: updated.sectionId },
+    });
+  }
 
   return res.json({ ok: true });
 }
 
-/*DELETE /sections/:id */
+/* DELETE /sections/:id ----------------------------------------------------- */
 export async function deleteSection(req, res) {
-  const { id } = req.params;
-  const { userId } = req.user;
+  const { id }          = req.params;
+  const { workspaceId } = req.body;
+  const { userId }      = req.user;
 
-  await Section.deleteOne({ sectionId: id, owner: userId });
+  const now    = Date.now();
+  const filter = workspaceId
+    ? { sectionId: id, workspaceId }
+    : { sectionId: id, owner: userId };
 
-  // Detach tasks also from deleted section
-  await Task.updateMany(
-    { sectionId: id },
-    { $set: { sectionId: null, updatedAt: Date.now() } }
-  );
+  await Section.updateOne(filter, { $set: { deleted: true, deletedAt: now, updatedAt: now } });
+
+  // Soft-delete tasks in this section
+  const taskFilter = workspaceId
+    ? { sectionId: id }
+    : { sectionId: id, createdBy: userId };
+  await Task.updateMany(taskFilter, { $set: { deleted: true, deletedAt: now, updatedAt: now } });
+
+  if (workspaceId) {
+    req.app.get("wsServer")?.broadcastToWorkspace(workspaceId, {
+      type: "SECTION_DELETE",
+      workspaceId,
+      sectionId: id,
+    });
+  }
 
   return res.json({ ok: true });
 }
