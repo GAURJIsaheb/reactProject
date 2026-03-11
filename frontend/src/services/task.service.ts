@@ -1,5 +1,6 @@
 import { authHeaders } from "@/services/auth.service";
 import { addTask, pruneSyncedTasksMissingOnServer } from "@/infrastructure/lib/idb";
+import type { Task } from "@/shared/types/task";
 
 const API_BASE = `http://${window.location.hostname}:4000`;
 
@@ -43,7 +44,11 @@ export async function fetchFromServer(
       await addTask({
         id,
         text: t.text,
+        labels: t.labels ?? [],
         image: t.imageUrl ?? t.image ?? null, // signed URL if cached, otherwise S3 key
+        imageUrl: t.imageUrl ?? null,
+        imageUrlExpiry: t.imageUrlExpiry ?? null,
+        reminderAt: t.reminderAt ?? null,
         completed: t.completed,
         archived: t.archived,
         deleted: t.deleted,
@@ -51,9 +56,11 @@ export async function fetchFromServer(
         sectionId: t.sectionId ?? null,
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,
+        workspaceId: t.workspaceId ?? null,
         userEmail,
         workspaceType: workspace,
         syncStatus: "synced",
+        version: t.version ?? 1,
       });
     }
 
@@ -64,11 +71,52 @@ export async function fetchFromServer(
   }
 }
 
+export async function fetchTasksFromServer(
+  token: string,
+  workspaceType: string,
+  workspaceId?: string | null
+): Promise<Task[]> {
+  const params = new URLSearchParams({ workspaceType });
+  if (workspaceId) params.set("workspaceId", workspaceId);
+
+  const res = await fetch(`${API_BASE}/tasks?${params.toString()}`, {
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error("fetch failed");
+
+  const serverTasks = await res.json();
+  return serverTasks.map((t: any) => ({
+    id: t.taskId ?? t.id,
+    text: t.text,
+    labels: t.labels ?? [],
+    completed: Boolean(t.completed),
+    archived: Boolean(t.archived),
+    deleted: Boolean(t.deleted),
+    deletedAt: t.deletedAt ?? null,
+    image: t.imageUrl ?? t.image ?? null,
+    imageUrl: t.imageUrl ?? null,
+    imageUrlExpiry: t.imageUrlExpiry ?? null,
+    reminderAt: t.reminderAt ?? null,
+    sectionId: t.sectionId ?? null,
+    createdAt: t.createdAt ?? Date.now(),
+    updatedAt: t.updatedAt ?? Date.now(),
+    userEmail: "",
+    workspaceType: t.workspaceType ?? workspaceType,
+    workspaceId: t.workspaceId ?? workspaceId ?? null,
+    syncStatus: "synced",
+    version: t.version ?? 1,
+    dirty: false,
+  }));
+}
+
 export async function apiCreateTask(task: any, token: string, imageFile?: File | null) {
   const fd = buildFormData({
     id: task.id,
     text: task.text,
     workspaceType: task.workspaceType,
+    workspaceId: task.workspaceId ?? null,
+    reminderAt: task.reminderAt ?? null,
+    labels: JSON.stringify(task.labels ?? []),
     ...(task.sectionId ? { sectionId: task.sectionId } : {}), // empty string nahi
   }, imageFile);
 

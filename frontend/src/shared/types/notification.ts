@@ -1,6 +1,6 @@
 export interface AppNotification {
   id: string;
-  kind: "task_completed";
+  kind: "task_completed" | "reminder";
   taskId: string;
   taskText: string;
   userEmail: string;
@@ -11,4 +11,5 @@ export interface AppNotification {
   createdAt: number;
   updatedAt: number;
   syncStatus: "synced" | "pending";
+  dueAt?: number | null;
 }

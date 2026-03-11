@@ -13,6 +13,7 @@ export function useDashboardState() {
 
   const [input, setInput] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [labelsInput, setLabelsInput] = useState("");
   const [reminderDate, setReminderDate] = useState("");
   const [reminderTime, setReminderTime] = useState("");
 
@@ -28,6 +29,7 @@ export function useDashboardState() {
     activeSectionId, setActiveSectionId,
     input, setInput,
     imageFile, setImageFile,
+    labelsInput, setLabelsInput,
     reminderDate, setReminderDate,
     reminderTime, setReminderTime,
     workspaceId, setWorkspaceId,

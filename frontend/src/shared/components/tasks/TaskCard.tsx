@@ -272,6 +272,23 @@ function TaskCard({
         </div>
       )}
 
+      {!!task.labels?.length && (
+        <div className="flex flex-wrap gap-1.5">
+          {task.labels.map((label) => (
+            <span
+              key={label}
+              className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-semibold border ${
+                isCompleted
+                  ? "border-gray-300/70 text-gray-500 bg-white/50"
+                  : `${palette.border} ${palette.text} bg-white/45`
+              }`}
+            >
+              #{label}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div
         className={`flex items-center justify-between mt-1 text-[11px] ${
           isCompleted ? "opacity-50" : ""

@@ -17,9 +17,11 @@ import { useArchiveEngine } from "./archiveEngine";
 interface ArchiveProps {
   tasks: Task[];
   onTasksChanged: () => Promise<void>;
+  workspace: string;
+  workspaceId?: string | null;
 }
 
-export default function Archive({ tasks, onTasksChanged }: ArchiveProps) {
+export default function Archive({ tasks, onTasksChanged, workspace, workspaceId }: ArchiveProps) {
   const [open, setOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [restoringIds, setRestoringIds] = useState<Set<string>>(new Set());
@@ -34,11 +36,11 @@ export default function Archive({ tasks, onTasksChanged }: ArchiveProps) {
     restoreTasks,
     restoreAllTasks,
     loadArchived,
-  } = useArchiveEngine(onTasksChanged);
+  } = useArchiveEngine(onTasksChanged, { workspaceType: workspace, workspaceId });
 
   useEffect(() => {
     if (open) loadArchived();
-  }, [open, loadArchived]);
+  }, [open, loadArchived, tasks]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {

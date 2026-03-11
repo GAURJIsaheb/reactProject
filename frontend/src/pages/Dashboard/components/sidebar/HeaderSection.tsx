@@ -4,12 +4,14 @@ import WorkspaceSelector from "./WorkspaceSelector";
 import NotificationsBell from "./NotificationsBell";
 import InviteModal       from "./InviteModal";
 import type { HeaderProps } from "./types";
+import { useNavigate } from "react-router-dom";
 
 export default function HeaderSection({
   workspace,
   setWorkspace,
   workspaceOptions,
   onAddWorkspace,
+  onDeleteWorkspace,
   userName,
   theme,
   toggleTheme,
@@ -19,7 +21,7 @@ export default function HeaderSection({
   onDismissNotification,
 }: HeaderProps) {
   const [showInvite, setShowInvite] = useState(false);
-
+  const navigate = useNavigate();
   const currentOption  = workspaceOptions.find((o) => o.value === workspace);
   const currentWsId    = (currentOption as (typeof currentOption & { id?: string }))?.id ?? workspace;
   const currentWsLabel = currentOption?.label ?? workspace;
@@ -59,6 +61,7 @@ export default function HeaderSection({
             setWorkspace={setWorkspace}
             workspaceOptions={workspaceOptions}
             onAddWorkspace={onAddWorkspace}
+            onDeleteWorkspace={onDeleteWorkspace}
             onInvite={() => setShowInvite(true)}
             theme={theme}
           />
@@ -86,6 +89,10 @@ export default function HeaderSection({
             onMarkAllRead={onMarkAllRead}
             onDismissNotification={onDismissNotification}
           />
+
+          <button onClick={() => navigate("/calendar")}>
+            📅
+          </button>
 
           <button
             onClick={logout}

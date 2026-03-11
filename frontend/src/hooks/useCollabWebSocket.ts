@@ -10,6 +10,7 @@ export type WsMessage =
   | { type: 'SECTION_DELETE'; workspaceId: string; sectionId: string  }
   | { type: 'MEMBER_JOINED';  workspaceId: string; userId:    string; email: string; name: string }
   | { type: 'MEMBER_REMOVED'; workspaceId: string; userId:    string  }
+  | { type: 'WORKSPACE_DELETED'; workspaceId: string }
   | { type: 'PRESENCE';       workspaceId: string; onlineUserIds: string[] };
 
 type Props = {

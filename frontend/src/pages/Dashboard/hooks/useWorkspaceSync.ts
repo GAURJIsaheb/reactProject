@@ -6,6 +6,8 @@ export function useWorkspaceSync(
   workspace: string,
   token: string | null,
   userEmail: string | null,
+  isSharedWorkspace: boolean,
+  currentWsId: string | null,
   setWorkspaceId: (id: string | null) => void,
   workspaceId: string | null,
   reloadTasks: () => Promise<void>,
@@ -16,12 +18,17 @@ export function useWorkspaceSync(
   useEffect(() => {
     if (!token) return;
 
+    if (currentWsId) {
+      setWorkspaceId(currentWsId);
+      return;
+    }
+
     setWorkspaceId(null);
 
     fetchWorkspaceId(workspace, token).then(id => {
       setWorkspaceId(id);
     });
-  }, [workspace, token]);
+  }, [workspace, token, currentWsId, setWorkspaceId]);
 
   // delta loop
   useEffect(() => {
@@ -31,6 +38,12 @@ export function useWorkspaceSync(
 
     const run = async () => {
       if (cancelled) return;
+      if (isSharedWorkspace) {
+        await reloadTasks();
+        await loadSections();
+        await reloadNotifications();
+        return;
+      }
 
       await processQueue(token);
 
@@ -60,5 +73,5 @@ export function useWorkspaceSync(
       clearInterval(interval);
       window.removeEventListener("focus", onFocus);
     };
-  }, [token, workspaceId, workspace, userEmail, reloadTasks, loadSections]);
+  }, [token, workspaceId, workspace, userEmail, reloadTasks, loadSections, reloadNotifications, isSharedWorkspace]);
 }

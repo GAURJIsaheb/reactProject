@@ -6,6 +6,8 @@ type Props = {
   setInput: (v: string) => void;
   imageFile: File | null;
   setImageFile: (f: File | null) => void;
+  labelsInput: string;
+  setLabelsInput: (v: string) => void;
   reminderDate: string;
   setReminderDate: (v: string) => void;
   reminderTime: string;
@@ -20,6 +22,8 @@ const InputSection = forwardRef<HTMLInputElement, Props>(
     setInput,
     imageFile,
     setImageFile,
+    labelsInput,
+    setLabelsInput,
     reminderDate,
     setReminderDate,
     reminderTime,
@@ -120,6 +124,16 @@ const InputSection = forwardRef<HTMLInputElement, Props>(
 
         <div className="mt-2 px-1">
           <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-card/60 px-3 py-2 sm:min-w-52">
+              <Hash size={13} className="text-foreground" />
+              <input
+                value={labelsInput}
+                onChange={(e) => setLabelsInput(e.target.value)}
+                placeholder="Labels: work, urgent"
+                className="w-full bg-background text-[12px] text-foreground outline-none placeholder:text-gray-500"
+              />
+            </div>
+
             <div className="flex items-center gap-2 rounded-xl border border-border bg-card/60 px-3 py-2">
               <CalendarDays size={13} className="text-foreground outline-none border border-border" />
               <input

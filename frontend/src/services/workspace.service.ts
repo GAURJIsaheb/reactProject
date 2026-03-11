@@ -30,8 +30,14 @@ export async function createServerWorkspace(
 // ─── List workspaces the caller owns or is a member of ────────────────────────
 export async function listMyWorkspaces(
   token: string
-): Promise<{ workspaces: { workspaceId: string; type: string; emoji: string; isOwner: boolean }[] }> {
+): Promise<{ workspaces: { workspaceId: string; type: string; emoji: string; isOwner: boolean; memberCount: number }[] }> {
   return apiCall('/workspace/mine', token);
+}
+
+export async function deleteWorkspace(workspaceId: string, token: string): Promise<void> {
+  await apiCall(`/workspace/${workspaceId}`, token, {
+    method: 'DELETE',
+  });
 }
 
 // ─── Send invite email to a collaborator ─────────────────────────────────────

@@ -8,6 +8,7 @@ import AdminDashboard from "./Admin/adminDashboard";
 import ResetPassword from "./pages/ResetPassword/ResetPassword";
 import ForgotPassword from "./pages/ForgotPassword/ForgotPassword";
 import InviteAccept from "./pages/InviteAccept/InviteAccept";
+import CalendarPage from "./pages/Calendar/Calendar";
 
 
 
@@ -91,6 +92,8 @@ function App() {
         } />
 
         <Route path="/invite/accept" element={<InviteAccept />} />
+
+        <Route path="/calendar" element={<CalendarPage />} />
       </Routes>
     </BrowserRouter>
   );

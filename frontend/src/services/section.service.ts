@@ -3,6 +3,20 @@ import { authHeaders } from "@/services/auth.service";
 
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
+function normalizeSection(section: any): Section {
+  return {
+    id: section.id ?? section.sectionId ?? section._id,
+    workspaceType: section.workspaceType ?? "personal",
+    userEmail: section.userEmail ?? "",
+    title: section.title,
+    order: section.order ?? 0,
+    createdAt: section.createdAt ?? Date.now(),
+    updatedAt: section.updatedAt ?? Date.now(),
+    workspaceId: section.workspaceId ?? null,
+    dirty: false,
+  };
+}
+
 export async function fetchSections(
   token:         string,
   workspaceType: string,
@@ -15,7 +29,8 @@ export async function fetchSections(
     headers: authHeaders(token),
   });
   if (!res.ok) throw new Error("Failed to fetch sections");
-  return res.json();
+  const data = await res.json();
+  return data.map((section: any) => normalizeSection(section));
 }
 
 export async function createSectionApi(
@@ -34,7 +49,8 @@ export async function createSectionApi(
     body:    JSON.stringify(payload),
   });
   if (!res.ok) throw new Error("Failed to create section");
-  return res.json();
+  const data = await res.json();
+  return normalizeSection(data.section ?? data);
 }
 
 export async function updateSectionApi(

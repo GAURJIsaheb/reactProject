@@ -87,6 +87,7 @@ export const addTask = async (task: Partial<Task>): Promise<void> => {
     ...existing, ...task,
     workspaceType: task.workspaceType ?? existing?.workspaceType ?? "personal",
     image: task.image !== undefined ? task.image : existing?.image,
+    labels: Array.isArray(task.labels) ? task.labels : (existing?.labels ?? []),
   });
 };
 
@@ -119,6 +120,13 @@ export const getAllTasks = async (
     (t) => t.userEmail === userEmail && (t.workspaceType || "personal") === workspaceType && !t.deleted
   );
 };
+
+export async function getAllTasksForUser(userEmail: string): Promise<Task[]> {
+  if (!userEmail) return [];
+  const db = await initDB();
+  const all = await db.getAll(STORE_TASKS);
+  return all.filter((t) => t.userEmail === userEmail && !t.deleted);
+}
 
 export async function pruneSyncedTasksMissingOnServer(
   userEmail: string, workspaceType: string, serverTaskIds: string[]
@@ -170,16 +178,30 @@ export async function updateTaskSectionInIDB(taskId: string, sectionId: string |
 }
 
 // Archive
-export async function getAllArchivedTasks(userEmail: string) {
+export async function getAllArchivedTasks(
+  userEmail: string,
+  workspaceType?: string,
+  workspaceId?: string | null
+) {
   if (!userEmail) return [];
   const db  = await initDB();
   const all = await db.getAll(STORE_ARCHIVE);
-  return all.filter((a) => a.userEmail === userEmail);
+  return all.filter((a) => {
+    if (workspaceId) return a.workspaceId === workspaceId;
+    if (workspaceType) {
+      return a.userEmail === userEmail && (a.workspaceType || "personal") === workspaceType;
+    }
+    return a.userEmail === userEmail;
+  });
 }
 export async function saveArchivedToDB(record: object)       { await (await initDB()).put(STORE_ARCHIVE, record); }
 export async function deleteArchivedFromDB(id: string)       { if (id) await (await initDB()).delete(STORE_ARCHIVE, id); }
-export async function clearAllArchivedFromDB(userEmail: string) {
-  const all = await getAllArchivedTasks(userEmail);
+export async function clearAllArchivedFromDB(
+  userEmail: string,
+  workspaceType?: string,
+  workspaceId?: string | null
+) {
+  const all = await getAllArchivedTasks(userEmail, workspaceType, workspaceId);
   const db  = await initDB();
   for (const r of all) await db.delete(STORE_ARCHIVE, r.id);
 }
@@ -230,6 +252,57 @@ export async function removeTasksFromQueue(taskIds: string[]): Promise<void> {
   const idSet = new Set(taskIds);
   for (const j of all)
     if (idSet.has(j.taskId)) await db.delete("syncQueue", j.id);
+}
+
+export async function clearWorkspaceDataFromIDB(
+  userEmail: string,
+  workspaceType: string,
+  workspaceId?: string | null
+): Promise<void> {
+  const db = await initDB();
+  const tx = db.transaction(
+    [STORE_TASKS, STORE_SECTIONS, STORE_ARCHIVE, STORE_NOTIFICATIONS, STORE_SYNC],
+    "readwrite"
+  );
+
+  const [tasks, sections, archives, notifications, queueJobs] = await Promise.all([
+    tx.objectStore(STORE_TASKS).getAll(),
+    tx.objectStore(STORE_SECTIONS).getAll(),
+    tx.objectStore(STORE_ARCHIVE).getAll(),
+    tx.objectStore(STORE_NOTIFICATIONS).getAll(),
+    tx.objectStore(STORE_SYNC).getAll(),
+  ]);
+
+  const matchesWorkspace = (record: { workspaceId?: string | null; workspaceType?: string; userEmail?: string }) => {
+    if (workspaceId) return record.workspaceId === workspaceId;
+    return record.userEmail === userEmail && (record.workspaceType || "personal") === workspaceType;
+  };
+
+  for (const task of tasks)
+    if (matchesWorkspace(task)) await tx.objectStore(STORE_TASKS).delete(task.id);
+
+  for (const section of sections)
+    if (matchesWorkspace(section)) await tx.objectStore(STORE_SECTIONS).delete(section.id);
+
+  for (const archive of archives) {
+    const matchesArchive = workspaceId
+      ? archive.workspaceId === workspaceId
+      : archive.userEmail === userEmail && (archive.workspaceType || "personal") === workspaceType;
+    if (matchesArchive) await tx.objectStore(STORE_ARCHIVE).delete(archive.id);
+  }
+
+  for (const notification of notifications)
+    if (notification.userEmail === userEmail && notification.workspaceType === workspaceType)
+      await tx.objectStore(STORE_NOTIFICATIONS).delete(notification.id);
+
+  for (const job of queueJobs) {
+    const matchesJob = workspaceId
+      ? job.workspaceId === workspaceId
+      : job.userEmail === userEmail && job.workspaceType === workspaceType;
+    if (matchesJob) await tx.objectStore(STORE_SYNC).delete(job.id);
+  }
+
+  await tx.done;
 }
 
 // ── Sections ──────────────────────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import { useSectionsEngine } from "@/hooks/useSectionsEngine";
 import { useTheme } from "@/shared/components/toggleTheme/theme";
 import { toast } from "sonner";
 
-import HeaderSection from "./components/header/HeaderSection";
+import Sidebar from "./components/sidebar/Sidebar";
 import StatsBar from "./components/StatsBar";
 import SearchBar from "./components/SearchBar";
 import Archive from "@/archive/archive";
@@ -36,10 +36,12 @@ export default function Dashboard() {
     setWorkspace,
     workspaceOptions,
     addWorkspace,
+    deleteWorkspace,
     createTask,
     toggleComplete,
     deleteTask,
     reloadTasks,
+    isSharedWorkspace,
     // ── collab additions ──
     currentWsId,
     sendWs,
@@ -58,6 +60,7 @@ export default function Dashboard() {
   } = useSectionsEngine({
     workspaceType: workspace,
     workspaceId:   currentWsId,   // null for personal/professional
+    sharedMode:    isSharedWorkspace,
     sendWs,
   });
 
@@ -76,6 +79,7 @@ export default function Dashboard() {
     activeSectionId, setActiveSectionId,
     input, setInput,
     imageFile, setImageFile,
+    labelsInput, setLabelsInput,
     reminderDate, setReminderDate,
     reminderTime, setReminderTime,
     workspaceId, setWorkspaceId,
@@ -87,7 +91,6 @@ export default function Dashboard() {
     reloadCompletionNotifications,
     handleMarkAllRead,
     handleDismissNotification,
-    setTaskReminder,
     getReminderLabel,
     getReminderDueAt,
   } = useDashboardNotifications({ tasks, workspace, userEmail, token });
@@ -101,6 +104,8 @@ export default function Dashboard() {
     workspace,
     token,
     userEmail,
+    isSharedWorkspace,
+    currentWsId,
     setWorkspaceId,
     workspaceId,
     reloadTasks,
@@ -112,13 +117,13 @@ export default function Dashboard() {
   const actions = useTaskActions({
     input, setInput,
     imageFile, setImageFile,
+    labelsInput, setLabelsInput,
     reminderDate, setReminderDate,
     reminderTime, setReminderTime,
     activeSectionId, setActiveSectionId,
     sections, hasNoSections,
     tasks, createTask, deleteTask, reloadTasks,
     workspace, userEmail, token, taskInputRef,
-    onTaskReminderSet: setTaskReminder,
   });
 
   // ───────── BOOT LOADING ─────────
@@ -131,43 +136,41 @@ export default function Dashboard() {
     setActiveSectionId(null);
   }, [workspace]);
 
-  const handleTaskReminderUpdate = useCallback(
-    (taskId: string, taskText: string, dueAt: number | null) => {
-      setTaskReminder(taskId, taskText, dueAt);
-    },
-    [setTaskReminder]
-  );
-
   const handleAddWorkspace = useCallback((name: string, emoji: string) => {
     addWorkspace(name, emoji);
   }, [addWorkspace]);
 
+  const handleDeleteWorkspace = useCallback(() => deleteWorkspace(), [deleteWorkspace]);
+
   // ───────── RENDER ─────────
   return (
     <>
-      {/* Ambient background orbs */}
-      <div className="dash-orbs" aria-hidden="true">
-        <div className="dash-orb dash-orb-1" />
-        <div className="dash-orb dash-orb-2" />
-        <div className="dash-orb dash-orb-3" />
-      </div>
+      {/* Sidebar */}
+      <Sidebar
+        workspace={workspace}
+        setWorkspace={setWorkspace}
+        workspaceOptions={workspaceOptions}
+        onAddWorkspace={handleAddWorkspace}
+        onDeleteWorkspace={handleDeleteWorkspace}
+        userName={userName}
+        theme={theme}
+        toggleTheme={toggleTheme}
+        logout={logout}
+        notifications={notifications}
+        onMarkAllRead={handleMarkAllRead}
+        onDismissNotification={handleDismissNotification}
+      />
 
-      <div className="dash-root">
-        <div className="dash-inner">
+      <div className="dash-layout mt-4 ml-2">
+        {/* Ambient background orbs */}
+        <div className="dash-orbs" aria-hidden="true">
+          <div className="dash-orb dash-orb-1" />
+          <div className="dash-orb dash-orb-2" />
+          <div className="dash-orb dash-orb-3" />
+        </div>
 
-          <HeaderSection
-            workspace={workspace}
-            setWorkspace={setWorkspace}
-            workspaceOptions={workspaceOptions}
-            onAddWorkspace={handleAddWorkspace}
-            userName={userName}
-            theme={theme}
-            toggleTheme={toggleTheme}
-            logout={logout}
-            notifications={notifications}
-            onMarkAllRead={handleMarkAllRead}
-            onDismissNotification={handleDismissNotification}
-          />
+        <div className="dash-root">
+          <div className="dash-inner">
 
           <StatsBar
             active={activeTasks.length}
@@ -175,7 +178,12 @@ export default function Dashboard() {
             total={tasks.length}
           />
 
-          <Archive tasks={tasks} onTasksChanged={reloadTasks} />
+          <Archive
+            tasks={tasks}
+            onTasksChanged={reloadTasks}
+            workspace={workspace}
+            workspaceId={currentWsId}
+          />
 
           {/* Search + Sort row */}
           <div className="w-[98%] ml-2 mb-5">
@@ -194,6 +202,8 @@ export default function Dashboard() {
               setInput={setInput}
               imageFile={imageFile}
               setImageFile={setImageFile}
+              labelsInput={labelsInput}
+              setLabelsInput={setLabelsInput}
               reminderDate={reminderDate}
               setReminderDate={setReminderDate}
               reminderTime={reminderTime}
@@ -225,6 +235,7 @@ export default function Dashboard() {
             />
           )}
 
+          </div>
         </div>
       </div>
 
@@ -233,14 +244,13 @@ export default function Dashboard() {
         onOpenChange={() => setViewTask(null)}
         task={viewTask}
         reminderDueAt={viewTask ? getReminderDueAt(viewTask.id) : null}
-        onSave={async (id, text, image, removeImage, reminderAt = null) => {
+        onSave={async (id, text, labels, image, removeImage, reminderAt = null) => {
           if (reminderAt !== null && reminderAt <= Date.now()) {
             toast.error("Reminder time should be in future");
             return false;
           }
-          const ok = await actions.handleEditSave(id, text, image, removeImage);
+          const ok = await actions.handleEditSave(id, text, labels, image, removeImage, reminderAt);
           if (!ok) return false;
-          handleTaskReminderUpdate(id, text, reminderAt);
           setViewTask(null);
           toast.success("Task updated");
           return true;

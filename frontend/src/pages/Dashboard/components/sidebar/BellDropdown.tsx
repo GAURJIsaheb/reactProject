@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { X } from "lucide-react";
 import type { ReminderNotification } from "./types";
 
 type Props = {
   bellRef: React.RefObject<HTMLDivElement | null>;
+  dropdownRef: React.RefObject<HTMLDivElement | null>;
   notifications: ReminderNotification[];
   onMarkAllRead: () => void;
   onDismissNotification: (n: ReminderNotification) => void;
@@ -11,31 +12,50 @@ type Props = {
 
 export default function BellDropdown({
   bellRef,
+  dropdownRef,
   notifications,
   onMarkAllRead,
   onDismissNotification,
 }: Props) {
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!bellRef.current) return;
 
-    const rect = bellRef.current.getBoundingClientRect();
+    const updatePosition = () => {
+      if (!bellRef.current) return;
 
-    setPos({
-      top: rect.bottom + 8,
-      right: window.innerWidth - rect.right,
-    });
+      const rect = bellRef.current.getBoundingClientRect();
+      const dropdownWidth = Math.min(320, window.innerWidth - 24);
+      const viewportPadding = 12;
+      const idealLeft = rect.left;
+      const maxLeft = window.innerWidth - dropdownWidth - viewportPadding;
+
+      setPos({
+        top: rect.bottom + 10,
+        left: Math.max(viewportPadding, Math.min(idealLeft, maxLeft)),
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
   }, [bellRef]);
 
   if (!pos) return null;
 
   return (
     <div
+      ref={dropdownRef}
       style={{
         position: "fixed",
         top: pos.top,
-        right: pos.right,
+        left: pos.left,
         zIndex: 9999,
       }}
       className="w-80 max-w-[85vw] rounded-2xl border border-white/10
@@ -61,11 +81,10 @@ export default function BellDropdown({
           {notifications.map((n) => (
             <div
               key={n.id}
-              className={`rounded-xl border px-3 py-2 ${
-                n.read
+              className={`rounded-xl border px-3 py-2 ${n.read
                   ? "border-white/10 bg-white/5 opacity-75"
                   : "border-indigo-400/35 bg-indigo-500/10"
-              }`}
+                }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <p className="text-[12px] font-semibold text-slate-100 truncate">

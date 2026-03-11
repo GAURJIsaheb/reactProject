@@ -13,10 +13,30 @@ interface Props {
   onSave: (
     id: string,
     text: string,
+    labels: string[],
     imageFile?: File | null,
     removeImage?: boolean,
     reminderAt?: number | null
   ) => Promise<boolean>;
+}
+
+function normalizeLabelsInput(value: string): string[] {
+  const seen = new Set<string>();
+  const labels: string[] = [];
+
+  for (const part of value.split(",")) {
+    const label = part.trim().replace(/\s+/g, " ").slice(0, 24);
+    if (!label) continue;
+
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    labels.push(label);
+
+    if (labels.length === 3) break;
+  }
+
+  return labels;
 }
 
 function toDateInput(dueAt: number | null): string {
@@ -45,6 +65,7 @@ export default function ViewTaskDialog({
 }: Props) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [text, setText] = useState("");
+  const [labelsInput, setLabelsInput] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [removedExisting, setRemovedExisting] = useState(false);
@@ -68,6 +89,7 @@ export default function ViewTaskDialog({
   useEffect(() => {
     if (!task) return;
     setText(task.text);
+    setLabelsInput((task.labels ?? []).join(", "));
     setImageFile(null);
     setPreview(task.imageUrl ?? task.image ?? null);
     setRemovedExisting(false);
@@ -109,6 +131,11 @@ export default function ViewTaskDialog({
   const handleSave = async () => {
     const trimmed = text.trim();
     if (!trimmed || isSaving) return;
+    const labels = normalizeLabelsInput(labelsInput);
+    if (labelsInput.trim() && labels.length === 0) {
+      toast.error("Add valid labels separated by commas");
+      return;
+    }
     const reminderAt = resolveReminderAt();
     if (Number.isNaN(reminderAt)) {
       toast.error("Reminder date and time both required");
@@ -116,7 +143,7 @@ export default function ViewTaskDialog({
     }
 
     setIsSaving(true);
-    const ok = await onSave(task.id, trimmed, imageFile, removedExisting, reminderAt);
+    const ok = await onSave(task.id, trimmed, labels, imageFile, removedExisting, reminderAt);
     setIsSaving(false);
     if (ok) onOpenChange(false);
   };
@@ -175,6 +202,15 @@ export default function ViewTaskDialog({
               onChange={(e) => setText(e.target.value)}
               className="w-full resize-none rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-[15px] font-semibold text-slate-900 outline-none focus:border-indigo-400/60 dark:bg-white/5 dark:border-white/10 dark:text-[#e8eaf0]"
             />
+            <input
+              value={labelsInput}
+              onChange={(e) => setLabelsInput(e.target.value)}
+              placeholder="Labels: bug, client, follow-up"
+              className="mt-3 w-full rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-[13px] font-medium text-slate-900 outline-none focus:border-indigo-400/60 dark:bg-white/5 dark:border-white/10 dark:text-[#e8eaf0]"
+            />
+            <p className="mt-2 text-[11px] text-slate-500 dark:text-gray-400">
+              Up to 3 labels. Separate with commas.
+            </p>
           </div>
 
           <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200 dark:bg-white/5 dark:border-white/10">

@@ -16,7 +16,7 @@ export default function SearchBar({ value, onChange }: Props) {
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Search tasks..."
+        placeholder="Search tasks or labels..."
         className={`
           w-full    
           pl-10 pr-4 py-3

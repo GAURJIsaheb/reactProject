@@ -2,11 +2,15 @@
 export interface Task {
   id:            string;
   text:          string;
+  labels:        string[];
   completed:     boolean;
   archived:      boolean;
   deleted:       boolean;
   deletedAt:     number | null;
   image:         string | null;
+  imageUrl?:     string | null;
+  imageUrlExpiry?: number | null;
+  reminderAt?:   number | null;
   sectionId:     string | null;
   createdAt:     number;
   updatedAt:     number;
