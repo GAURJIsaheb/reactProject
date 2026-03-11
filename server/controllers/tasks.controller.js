@@ -7,17 +7,58 @@ import {
   resolveImageUrl,
 } from '../s3/s3Service.js';
 import { upsertTaskCompletedNotification } from './notifications.controller.js';
+import { getDefaultWorkspaceEmoji, normalizeWorkspaceType } from '../utils/workspaceDefaults.js';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 // Attach signed URLs to an array of lean task objects
-function normalizeWorkspaceType(workspaceType) {
-  return String(workspaceType ?? 'personal').trim().toLowerCase() || 'personal';
+function normalizeReminderAt(reminderAt) {
+  if (reminderAt === undefined || reminderAt === null || reminderAt === '') return null;
+  const parsed = Number(reminderAt);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeLabels(labels) {
+  let raw = labels;
+
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+
+    try {
+      raw = JSON.parse(trimmed);
+    } catch {
+      raw = trimmed.split(',');
+    }
+  }
+
+  if (!Array.isArray(raw)) return [];
+
+  const seen = new Set();
+  const normalized = [];
+
+  for (const value of raw) {
+    const label = String(value ?? '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .slice(0, 24);
+
+    if (!label) continue;
+
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(label);
+
+    if (normalized.length === 3) break;
+  }
+
+  return normalized;
 }
 
 async function ensureWorkspace(userId, workspaceType) {
   const type = normalizeWorkspaceType(workspaceType);
-  let workspace = await Workspace.findOne({ owner: userId, type }).lean();
+  let workspace = await Workspace.findOne({ owner: userId, type, deleted: false }).lean();
   if (workspace) return workspace;
 
   try {
@@ -25,22 +66,76 @@ async function ensureWorkspace(userId, workspaceType) {
       workspaceId: crypto.randomUUID(),
       owner: userId,
       type,
+      emoji: getDefaultWorkspaceEmoji(type),
       members: [userId],
     });
     return workspace.toObject();
   } catch (err) {
     if (err?.code !== 11000) throw err;
-    return Workspace.findOne({ owner: userId, type }).lean();
+    return Workspace.findOne({ owner: userId, type, deleted: false }).lean();
+  }
+}
+
+async function resolveWorkspace(userId, workspaceType, workspaceId) {
+  if (workspaceId) {
+    return Workspace.findOne({
+      workspaceId,
+      deleted: false,
+      $or: [{ owner: userId }, { members: userId }],
+    }).lean();
+  }
+
+  return ensureWorkspace(userId, workspaceType);
+}
+
+const TASK_PROJECTION = {
+  _id: 0,
+  taskId: 1,
+  workspaceId: 1,
+  sectionId: 1,
+  text: 1,
+  labels: 1,
+  image: 1,
+  imageUrl: 1,
+  imageUrlExpiry: 1,
+  reminderAt: 1,
+  completed: 1,
+  archived: 1,
+  deleted: 1,
+  deletedAt: 1,
+  createdBy: 1,
+  workspaceType: 1,
+  version: 1,
+  createdAt: 1,
+  updatedAt: 1,
+};
+
+async function broadcastTaskState(req, type, taskOrTasks) {
+  const wsServer = req.app.get('wsServer');
+  if (!wsServer) return;
+
+  const tasks = Array.isArray(taskOrTasks) ? taskOrTasks : [taskOrTasks];
+  for (const task of tasks) {
+    if (!task?.workspaceId) continue;
+    wsServer.broadcastToWorkspace(task.workspaceId, {
+      type,
+      workspaceId: task.workspaceId,
+      ...(type === 'TASK_DELETE'
+        ? { taskId: task.taskId ?? task.id }
+        : { task: { ...task, id: task.taskId ?? task.id } }),
+    });
   }
 }
 
 // ─── Create ───────────────────────────────────────────────────────────────────
 export const createTask = async (req, res) => {
-  const { id, text, workspaceType, sectionId } = req.body;
+  const { id, text, workspaceType, workspaceId, sectionId, reminderAt, labels } = req.body;
   const { userId } = req.user;
   const normalizedWorkspaceType = normalizeWorkspaceType(workspaceType);
+  const normalizedReminderAt = normalizeReminderAt(reminderAt);
+  const normalizedLabels = normalizeLabels(labels);
 
-  const workspace = await ensureWorkspace(userId, normalizedWorkspaceType);
+  const workspace = await resolveWorkspace(userId, normalizedWorkspaceType, workspaceId);
   if (!workspace) return res.status(404).json({ error: 'workspace not found' });
 
   const existing = await Task.findOne({ taskId: id }).lean();
@@ -60,7 +155,12 @@ export const createTask = async (req, res) => {
 
       const updated = await Task.findOneAndUpdate(
         { taskId: id },
-        { image: imageKey, updatedAt: Date.now() },
+        {
+          image: imageKey,
+          reminderAt: normalizedReminderAt ?? existing.reminderAt ?? null,
+          labels: normalizedLabels.length ? normalizedLabels : existing.labels ?? [],
+          updatedAt: Date.now(),
+        },
         { new: true }
       ).lean();
 
@@ -89,13 +189,17 @@ export const createTask = async (req, res) => {
     workspaceId:   workspace.workspaceId,
     sectionId:     sectionId ?? null,
     text,
+    labels:        normalizedLabels,
     image:         imageKey,
+    reminderAt:    normalizedReminderAt,
     createdBy:     userId,
     workspaceType: normalizedWorkspaceType,
   });
 
   const taskObj  = task.toObject();
   const resolved = await resolveImageUrl(taskObj, Task);
+
+  await broadcastTaskState(req, 'TASK_CREATE', resolved);
 
   res.json({ status: 'ok', task: resolved });
 };
@@ -107,6 +211,7 @@ export const bulkCreateTasks =async (req, res) => {
   if (!tasks?.length) return res.json({ ok: true });
 
   const types = [...new Set(tasks.map(t => normalizeWorkspaceType(t.workspaceType)))];
+  const explicitWorkspaceIds = [...new Set(tasks.map((t) => t.workspaceId).filter(Boolean))];
   const { userId } = req.user;
 
   const workspaceMap = {};
@@ -115,12 +220,22 @@ export const bulkCreateTasks =async (req, res) => {
     if (ws) workspaceMap[type] = ws.workspaceId;
   }
 
+  const allowedWorkspaceIds = new Set();
+  for (const id of explicitWorkspaceIds) {
+    const ws = await resolveWorkspace(userId, 'personal', id);
+    if (ws) allowedWorkspaceIds.add(ws.workspaceId);
+  }
+
   const docs = tasks.map(t => ({
     taskId:        t.id,
-    workspaceId:   workspaceMap[normalizeWorkspaceType(t.workspaceType)],
+    workspaceId:   allowedWorkspaceIds.has(t.workspaceId)
+      ? t.workspaceId
+      : workspaceMap[normalizeWorkspaceType(t.workspaceType)],
     sectionId:     t.sectionId ?? null,
     text:          t.text,
+    labels:        normalizeLabels(t.labels),
     image:         t.image || null,   // bulk create accepts S3 keys only (no upload here)
+    reminderAt:    normalizeReminderAt(t.reminderAt),
     completed:     t.completed  ?? false,
     archived:      t.archived   ?? false,
     deleted:       t.deleted    ?? false,
@@ -141,11 +256,11 @@ export const bulkCreateTasks =async (req, res) => {
 // ─── Get All ──────────────────────────────────────────────────────────────────
 
 export const getAllTasks = async (req, res) => {
-  const { workspaceType } = req.query;
+  const { workspaceType, workspaceId } = req.query;
   const { userId } = req.user;
   const normalizedWorkspaceType = normalizeWorkspaceType(workspaceType);
 
-  const ws = await ensureWorkspace(userId, normalizedWorkspaceType);
+  const ws = await resolveWorkspace(userId, normalizedWorkspaceType, workspaceId);
   if (!ws) return res.json([]);
 
   const tasks = await Task.find(
@@ -156,6 +271,7 @@ export const getAllTasks = async (req, res) => {
       workspaceId: 1,
       sectionId: 1,
       text: 1,
+      labels: 1,
       image: 1,
       imageUrl: 1,
       imageUrlExpiry: 1,
@@ -184,12 +300,14 @@ export const updateTask = async (req, res) => {
   if (!task) return res.status(404).json({ error: 'Task not found' });
   const wasCompleted = task.completed;
 
-  const { text, completed, archived, sectionId, removeImage } = req.body;
+  const { text, completed, archived, sectionId, removeImage, reminderAt, labels } = req.body;
 
   if (text      !== undefined) task.text      = text;
+  if (labels    !== undefined) task.labels    = normalizeLabels(labels);
   if (completed !== undefined) task.completed = completed;
   if (archived  !== undefined) task.archived  = archived;
   if (sectionId !== undefined) task.sectionId = sectionId;
+  if (reminderAt !== undefined) task.reminderAt = normalizeReminderAt(reminderAt);
 
   // New image uploaded
   if (req.file) {
@@ -224,13 +342,15 @@ export const updateTask = async (req, res) => {
   const taskObj  = task.toObject();
   const resolved = await resolveImageUrl(taskObj, Task);
 
+  await broadcastTaskState(req, 'TASK_UPDATE', resolved);
+
   res.json({ status: 'ok', task: resolved });
 };
 
 // ─── Delete ───────────────────────────────────────────────────────────────────
 
 export const deleteTask =async (req, res) => {
-  const task = await Task.findOne({ taskId: req.params.id }).select('image').lean();
+  const task = await Task.findOne({ taskId: req.params.id }).select('taskId workspaceId image').lean();
   if (task?.image) {
     await deleteImageFromS3(task.image);
   }
@@ -248,6 +368,7 @@ export const deleteTask =async (req, res) => {
       },
     }
   );
+  await broadcastTaskState(req, 'TASK_DELETE', task);
   res.json({ status: 'ok' });
 };
 
@@ -268,14 +389,27 @@ export const bulkUpdateTasks = async (req, res) => {
       }).select('taskId text createdBy workspaceType').lean()
     : [];
 
-  const bulkOps = updates.map(({ taskId, payload }) => ({
-    updateOne: {
-      filter: { taskId },
-      update: { $set: { ...payload, updatedAt: Date.now() } },
-    },
-  }));
+  const bulkOps = updates.map(({ taskId, payload }) => {
+    const normalizedPayload = { ...payload };
+    if (Object.prototype.hasOwnProperty.call(payload ?? {}, 'labels')) {
+      normalizedPayload.labels = normalizeLabels(payload.labels);
+    }
+
+    return {
+      updateOne: {
+        filter: { taskId },
+        update: { $set: { ...normalizedPayload, updatedAt: Date.now() } },
+      },
+    };
+  });
 
   const result = await Task.bulkWrite(bulkOps, { ordered: false });
+
+  const updatedTasks = await Task.find(
+    { taskId: { $in: updates.map((u) => u.taskId) } },
+    TASK_PROJECTION
+  ).lean();
+  await broadcastTaskState(req, 'TASK_UPDATE', updatedTasks);
 
   if (toNotify.length > 0) {
     await Promise.allSettled(
@@ -301,10 +435,9 @@ export const bulkDeleteTasks =async (req, res) => {
 
   const tasks = await Task.find({
     taskId: { $in: taskIds },
-    image: { $ne: null },
-  }).select('image').lean();
+  }).select('taskId workspaceId image').lean();
 
-  await Promise.allSettled(tasks.map(t => deleteImageFromS3(t.image)));
+  await Promise.allSettled(tasks.filter((t) => t.image).map(t => deleteImageFromS3(t.image)));
 
   const now    = Date.now();
   const result = await Task.updateMany(
@@ -320,17 +453,18 @@ export const bulkDeleteTasks =async (req, res) => {
       },
     }
   );
+  await broadcastTaskState(req, 'TASK_DELETE', tasks);
   res.json({ ok: true, deleted: result.modifiedCount });
 };
 
 // ─── Sync ─────────────────────────────────────────────────────────────────────
 
 export const getWorkspaceId = async (req, res) => {
-  const { workspaceType } = req.query;
+  const { workspaceType, workspaceId } = req.query;
   const { userId } = req.user;
   const normalizedWorkspaceType = normalizeWorkspaceType(workspaceType);
 
-  const ws = await ensureWorkspace(userId, normalizedWorkspaceType);
+  const ws = await resolveWorkspace(userId, normalizedWorkspaceType, workspaceId);
   if (!ws) return res.status(404).json({ error: 'workspace not found' });
 
   res.json({ workspaceId: ws.workspaceId });
@@ -367,6 +501,7 @@ export const syncTasks = async (req, res) => {
       workspaceId: 1,
       sectionId: 1,
       text: 1,
+      labels: 1,
       image: 1,
       imageUrl: 1,
       imageUrlExpiry: 1,

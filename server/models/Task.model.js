@@ -5,9 +5,11 @@ const taskSchema = new mongoose.Schema({
   workspaceId:   { type: String,  required: true, ref: 'workspaces' },
   sectionId:     { type: String,  default: null,  ref: 'sections' },
   text:          { type: String,  required: true, trim: true },
+  labels:        { type: [String], default: [] },
   image:         { type: String,  default: null }, // S3 key
   imageUrl:      { type: String,  default: null }, // cached signed URL
   imageUrlExpiry:{ type: Number,  default: null }, // ms timestamp
+  reminderAt:    { type: Number,  default: null },
   completed:     { type: Boolean, default: false },
   archived:      { type: Boolean, default: false },
   deleted:       { type: Boolean, default: false },

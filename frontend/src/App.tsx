@@ -35,7 +35,7 @@ function App() {
       });
       if (!res.ok) throw new Error("auth/me failed");
       const data = await res.json();
-      setAuth(token, data.user.name, data.user.email, data.user.userId);
+      setAuth(token, data.user.name, data.user.email, data.user.userId ,data.user.role);
 
       // ── Step 2: Check admin role from /auth/me response  ────────
 

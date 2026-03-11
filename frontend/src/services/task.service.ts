@@ -4,6 +4,10 @@ import type { Task } from "@/shared/types/task";
 
 const API_BASE = `http://${window.location.hostname}:4000`;
 
+function getErrorMessage(data: { error?: string; message?: string } | null | undefined, fallback: string) {
+  return data?.error || data?.message || fallback;
+}
+
 // For routes that may have an image - use FormData
 function buildFormData(data: Record<string, any>, imageFile?: File | null): FormData {
   const fd = new FormData();
@@ -126,8 +130,9 @@ export async function apiCreateTask(task: any, token: string, imageFile?: File |
     body: fd,
   });
 
-  if (!res.ok) throw new Error("create failed");
-  return res.json();
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(getErrorMessage(data, "create failed"));
+  return data;
 }
 
 

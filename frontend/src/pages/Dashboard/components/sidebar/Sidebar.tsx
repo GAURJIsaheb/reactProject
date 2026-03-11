@@ -1,21 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import {
-  Anchor,
-  Moon,
-  Sun,
-  LogOut,
-  Menu,
-  X,
-  Calendar,
-  LayoutDashboard,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import {Anchor,Moon,Sun,LogOut,Menu,X,Calendar,LayoutDashboard,ChevronLeft,ChevronRight,} from "lucide-react";
 import WorkspaceSelector from "./WorkspaceSelector";
 import NotificationsBell from "./NotificationsBell";
 import InviteModal from "./InviteModal";
 import type { HeaderProps } from "./types";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuthStore } from "@/zustand/authStore";
 
 /* ─── animation helper ─── */
 const TRANSITION = "all 0.35s cubic-bezier(0.4, 0, 0.2, 1)";
@@ -86,6 +76,7 @@ export default function Sidebar({
   }, [collapsed, onCollapseChange]);
 
   const isActive = (path: string) => location.pathname === path;
+  const role = useAuthStore((state) => state.role);
 
   /* ────────────────────── Sidebar content ────────────────────── */
   const sidebarContent = (isMobile: boolean) => (
@@ -184,7 +175,7 @@ export default function Sidebar({
             </div>
             <div className="sidebar-user-info">
               <div className="sidebar-user-name">{userName}</div>
-              <div className="sidebar-user-role">Member</div>
+              <div className="sidebar-user-role">{role}</div>
             </div>
           </div>
         )}

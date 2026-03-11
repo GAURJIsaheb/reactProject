@@ -170,6 +170,66 @@ export function useTaskActions({
     });
   }, [tasks, deleteTask]);
 
+  const handleAddFromSpeech = useCallback(async (spokenText: string) => {
+    if (hasNoSections) return null;
+    const trimmed = spokenText.trim();
+    if (!trimmed) {
+      toast.error("No speech detected. Please try again.");
+      return null;
+    }
+
+    const targetSectionId = activeSectionId ?? sections[0]?.id ?? null;
+    if (!targetSectionId) return null;
+
+    const labels = normalizeLabelsInput(labelsInput);
+    if (labelsInput.trim() && labels.length === 0) {
+      toast.error("Enter valid labels separated by commas");
+      return null;
+    }
+
+    const reminderAt = resolveReminderAt();
+    if (Number.isNaN(reminderAt)) {
+      toast.error("Reminder date and time both required");
+      return null;
+    }
+    if (reminderAt !== null && reminderAt <= Date.now()) {
+      toast.error("Reminder time should be in future");
+      return null;
+    }
+
+    setInput(trimmed);
+    const createdTask = await createTask(
+      trimmed,
+      null,
+      targetSectionId,
+      reminderAt,
+      labels
+    );
+    if (!createdTask) return null;
+
+    setInput("");
+    setImageFile(null);
+    setLabelsInput("");
+    setReminderDate("");
+    setReminderTime("");
+
+    playSuccessSound();
+    toast.success("Task added", { description: `"${createdTask.text}"`, duration: 2500 });
+    return createdTask;
+  }, [
+    hasNoSections,
+    activeSectionId,
+    sections,
+    labelsInput,
+    resolveReminderAt,
+    createTask,
+    setInput,
+    setImageFile,
+    setLabelsInput,
+    setReminderDate,
+    setReminderTime,
+  ]);
+
   const handleEditSave = useCallback(
     async (
       id: string,
@@ -253,6 +313,7 @@ export function useTaskActions({
   return {
     handleAdd,
     handleDelete,
+    handleAddFromSpeech,
     handleEditSave,
     handleTaskAddInSection,
     handleClearSection,

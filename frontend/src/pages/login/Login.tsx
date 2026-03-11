@@ -55,7 +55,9 @@ export default function Login() {
         data.token,
         data.user.name,
         data.user.email,
-        data.user.userId
+        data.user.userId,
+        data.user.role,
+
       );
 
   const pendingInvite = sessionStorage.getItem("pendingInviteUrl");

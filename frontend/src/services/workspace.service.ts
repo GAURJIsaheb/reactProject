@@ -1,5 +1,9 @@
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
+function getErrorMessage(data: { error?: string; message?: string } | null | undefined, fallback: string) {
+  return data?.error ?? data?.message ?? fallback;
+}
+
 async function apiCall(path: string, token: string, options: RequestInit = {}) {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
@@ -11,7 +15,7 @@ async function apiCall(path: string, token: string, options: RequestInit = {}) {
   });
 
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
+  if (!res.ok) throw new Error(getErrorMessage(data, `Request failed (${res.status})`));
   return data;
 }
 

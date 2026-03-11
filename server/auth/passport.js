@@ -24,7 +24,12 @@ passport.use(
 
 
       //return done(error,  {userobject})--> if error is null and user is valid then it will return user details in req.user
-        return done(null, { email: user.email, name: user.name, userId: user._id.toString() });
+        return done(null, {
+          email: user.email,
+          name: user.name,
+          userId: user._id.toString(),
+          role: user.role ?? "user",
+        });
       } catch (err) {
         return done(err);
       }
@@ -42,7 +47,12 @@ passport.use(
     },
     async (payload, done) => {
       try {
-        return done(null, { email: payload.email, name: payload.name, userId: payload.userId });
+        return done(null, {
+          email: payload.email,
+          name: payload.name,
+          userId: payload.userId,
+          role: payload.role ?? "user",
+        });
       } catch (err) {
         return done(err);
       }

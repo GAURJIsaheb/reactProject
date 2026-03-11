@@ -7,7 +7,7 @@ import { Task }    from "../models/Task.model.js";
 function wsFilter(req, extra = {}) {
   const { workspaceType, workspaceId } = { ...req.query, ...req.body };
   const { userId } = req.user;
-  if (workspaceId) return { workspaceId, ...extra };
+  if (workspaceId) return { workspaceId, deleted: { $ne: true }, ...extra };
   return { owner: userId, workspaceType: workspaceType ?? "personal", ...extra };
 }
 
@@ -67,8 +67,8 @@ export async function updateSection(req, res) {
   const { userId }                    = req.user;
 
   const filter = workspaceId
-    ? { sectionId: id, workspaceId }
-    : { sectionId: id, owner: userId };
+    ? { sectionId: id, workspaceId, deleted: { $ne: true } }
+    : { sectionId: id, owner: userId, deleted: { $ne: true } };
 
   const update = { updatedAt: Date.now() };
   if (title !== undefined) update.title = title;
@@ -97,15 +97,15 @@ export async function deleteSection(req, res) {
 
   const now    = Date.now();
   const filter = workspaceId
-    ? { sectionId: id, workspaceId }
-    : { sectionId: id, owner: userId };
+    ? { sectionId: id, workspaceId, deleted: { $ne: true } }
+    : { sectionId: id, owner: userId, deleted: { $ne: true } };
 
   await Section.updateOne(filter, { $set: { deleted: true, deletedAt: now, updatedAt: now } });
 
   // Soft-delete tasks in this section
   const taskFilter = workspaceId
-    ? { sectionId: id }
-    : { sectionId: id, createdBy: userId };
+    ? { sectionId: id, deleted: false }
+    : { sectionId: id, createdBy: userId, deleted: false };
   await Task.updateMany(taskFilter, { $set: { deleted: true, deletedAt: now, updatedAt: now } });
 
   if (workspaceId) {

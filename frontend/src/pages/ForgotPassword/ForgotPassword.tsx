@@ -23,10 +23,14 @@ export default function ForgotPassword() {
         body:    JSON.stringify({ email: trimmed }),
       });
 
-      if (!res.ok) throw new Error();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || data.message || "Something went wrong. Try again.");
+      }
+
       setSent(true);
-    } catch {
-      toast.error("Something went wrong. Try again.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Something went wrong. Try again.");
     } finally {
       setLoading(false);
     }

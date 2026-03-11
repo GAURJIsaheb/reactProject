@@ -1,5 +1,9 @@
 const API = "http://localhost:4000";
 
+function getErrorMessage(data: { error?: string; message?: string } | null | undefined, fallback: string) {
+  return data?.error || data?.message || fallback;
+}
+
 /* LOGIN */
 export async function loginUser(payload: {
   email: string;
@@ -12,7 +16,7 @@ export async function loginUser(payload: {
   });
 
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Login failed");
+  if (!res.ok) throw new Error(getErrorMessage(data, "Login failed"));
   return data;
 }
 
@@ -29,7 +33,7 @@ export async function signupUser(payload: {
   });
 
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Signup failed");
+  if (!res.ok) throw new Error(getErrorMessage(data, "Signup failed"));
   return data;
 }
 

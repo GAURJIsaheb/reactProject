@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { requireAuth } from '../middlewares/requireAuth.js';
+import { workspaceInviteRateLimiter } from '../middlewares/rateLimiter.js';
 import {
   createWorkspace,
   listMyWorkspaces,
+  deleteWorkspace,
   inviteMember,
   acceptInvite,
   getMembers,
@@ -20,7 +22,8 @@ router.use(requireAuth);
 
 router.post('/',                                        createWorkspace);
 router.get('/mine',                                     listMyWorkspaces);
-router.post('/invite',                                  inviteMember);
+router.delete('/:workspaceId',                          deleteWorkspace);
+router.post('/invite',                                  workspaceInviteRateLimiter, inviteMember);
 router.get('/invite/accept',                            acceptInvite);
 router.get('/:workspaceId/members',                     getMembers);
 router.delete('/:workspaceId/members/:memberId',        removeMember);

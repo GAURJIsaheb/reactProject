@@ -11,7 +11,7 @@ export async function signupFlow(
 
   const { setAuth } = useAuthStore.getState();
 
-  setAuth(data.token, data.user.name, data.user.email, data.user.userId);
+  setAuth(data.token, data.user.name, data.user.email, data.user.userId ,data.user.role);
 
   await saveUser({
     userId: data.user.userId,

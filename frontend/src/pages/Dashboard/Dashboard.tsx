@@ -209,6 +209,7 @@ export default function Dashboard() {
               reminderTime={reminderTime}
               setReminderTime={setReminderTime}
               handleAdd={actions.handleAdd}
+              handleCreateFromSpeech={actions.handleAddFromSpeech}
               sectionName={activeSectionLabel ?? undefined}
             />
           )}
