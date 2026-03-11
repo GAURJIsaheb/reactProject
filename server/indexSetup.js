@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import session from 'express-session';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import authRoutes from './auth/auth.js';
@@ -26,13 +25,6 @@ export function createServer() {
   app.use(express.json({ limit: "10mb" }));//for Content-Type: application/json
   app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-  app.use(session({
-    name: 'todo.sid',
-    secret:process.env.SESSION_KEY,
-    resave: false,
-    saveUninitialized: false,//lazy allocation for sessions.
-    cookie: { httpOnly: true, sameSite: 'lax', maxAge: 1000 * 60 * 60 * 24 }
-  }));
 
   // ── Passport ──────────────────────────────
   app.use(passport.initialize()); 

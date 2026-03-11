@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Plus, Trash2, X, UserPlus } from "lucide-react";
+import { LoaderCircle, Plus, Trash2, X, UserPlus } from "lucide-react";
 import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
 import type { WorkspaceOption } from "@/hooks/useTasksEngine";
 import {
@@ -19,6 +19,7 @@ type Props = {
   workspaceOptions: WorkspaceOption[];
   onAddWorkspace: (name: string, emoji: string) => void;
   onDeleteWorkspace: () => Promise<boolean>;
+  isDeletingWorkspace: boolean;
   onInvite?: () => void;
   theme: string;
 };
@@ -29,6 +30,7 @@ export default function WorkspaceSelector({
   workspaceOptions,
   onAddWorkspace,
   onDeleteWorkspace,
+  isDeletingWorkspace,
   onInvite,
   theme,
 }: Props) {
@@ -225,6 +227,7 @@ export default function WorkspaceSelector({
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeletingWorkspace}
                 className="h-8 px-3 rounded-lg border border-border text-xs"
               >
                 Cancel
@@ -232,9 +235,17 @@ export default function WorkspaceSelector({
               <button
                 type="button"
                 onClick={() => void handleDeleteWorkspace()}
-                className="h-8 px-3 rounded-lg bg-red-500 text-white text-xs font-medium"
+                disabled={isDeletingWorkspace}
+                className="h-8 min-w-24 px-3 rounded-lg bg-red-500 text-white text-xs font-medium inline-flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                Delete
+                {isDeletingWorkspace ? (
+                  <>
+                    <LoaderCircle size={14} className="animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete"
+                )}
               </button>
             </CardFooter>
           </Card>
@@ -243,4 +254,3 @@ export default function WorkspaceSelector({
     </div>
   );
 }
-

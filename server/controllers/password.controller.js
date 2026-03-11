@@ -11,7 +11,10 @@ export const forgotPassword =async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required' });
 
-  const user = await User.findOne({ email: email.toLowerCase() }).lean();
+  const user = await User.findOne(
+    { email: email.toLowerCase() },
+    { _id: 1, email: 1, name: 1 }
+  ).lean();
 
   // Always return same response — don't leak if email exists
   if (!user) {
@@ -51,7 +54,10 @@ export const resetPassword = async (req, res) => {
   if (!token || !newPassword) return res.status(400).json({ error: 'Token and password required' });
   if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
-  const resetToken = await ResetToken.findOne({ token, used: false });
+  const resetToken = await ResetToken.findOne(
+    { token, used: false },
+    { _id: 1, userId: 1, expiresAt: 1 }
+  ).lean();
 
   if (!resetToken) return res.status(400).json({ error: 'Invalid or expired token' });
   if (new Date() > resetToken.expiresAt) {

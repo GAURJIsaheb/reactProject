@@ -20,6 +20,7 @@ export default function Sidebar({
   workspaceOptions,
   onAddWorkspace,
   onDeleteWorkspace,
+  isDeletingWorkspace,
   userName,
   theme,
   toggleTheme,
@@ -100,6 +101,7 @@ export default function Sidebar({
             workspaceOptions={workspaceOptions}
             onAddWorkspace={onAddWorkspace}
             onDeleteWorkspace={onDeleteWorkspace}
+            isDeletingWorkspace={isDeletingWorkspace}
             onInvite={() => setShowInvite(true)}
             theme={theme}
           />

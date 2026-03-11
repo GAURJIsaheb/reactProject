@@ -1,52 +1,36 @@
 import { Archive }   from '../models/Archive.model.js';
 import { Task }      from '../models/Task.model.js';
 import { Workspace } from '../models/Workspace.model.js';
-
-function normalizeWorkspaceType(workspaceType) {
-  return String(workspaceType ?? 'personal').trim().toLowerCase() || 'personal';
-}
+import { normalizeWorkspaceType } from '../utils/workspaceDefaults.js';
+import { TASK_PUBLIC_PROJECTION } from '../utils/taskProjection.js';
 
 async function resolveArchiveWorkspace(userId, workspaceId, workspaceType) {
   if (workspaceId) {
-    return Workspace.findOne({
-      workspaceId,
-      deleted: false,
-      $or: [{ owner: userId }, { members: userId }],
-    }).lean();
+    return Workspace.findOne(
+      {
+        workspaceId,
+        deleted: false,
+        $or: [{ owner: userId }, { members: userId }],
+      },
+      { _id: 0, workspaceId: 1 }
+    ).lean();
   }
 
-  return Workspace.findOne({
-    owner: userId,
-    type: normalizeWorkspaceType(workspaceType),
-    deleted: false,
-  }).lean();
+  return Workspace.findOne(
+    {
+      owner: userId,
+      type: normalizeWorkspaceType(workspaceType),
+      deleted: false,
+    },
+    { _id: 0, workspaceId: 1 }
+  ).lean();
 }
 
 async function broadcastTaskUpdates(req, workspaceId, taskIds) {
   if (!workspaceId || !taskIds.length) return;
   const updatedTasks = await Task.find(
     { taskId: { $in: taskIds } },
-    {
-      _id: 0,
-      taskId: 1,
-      workspaceId: 1,
-      sectionId: 1,
-      text: 1,
-      labels: 1,
-      image: 1,
-      imageUrl: 1,
-      imageUrlExpiry: 1,
-      reminderAt: 1,
-      completed: 1,
-      archived: 1,
-      deleted: 1,
-      deletedAt: 1,
-      createdBy: 1,
-      workspaceType: 1,
-      version: 1,
-      createdAt: 1,
-      updatedAt: 1,
-    }
+    TASK_PUBLIC_PROJECTION
   ).lean();
 
   const wsServer = req.app.get('wsServer');
@@ -113,7 +97,9 @@ export const getArchive = async (req, res) => {
   const tasks = await Archive.find({
     workspaceId: workspace.workspaceId,
     restoredAt: null,
-  }).lean();
+  })
+    .select('_id userId workspaceId encryptedPayload archivedAt restoredAt')
+    .lean();
   res.json({ tasks });
 };
 
@@ -150,7 +136,9 @@ export const restoreAll = async (req, res) => {
   const archived = await Archive.find({
     workspaceId: workspace.workspaceId,
     restoredAt: null,
-  }).lean();
+  })
+    .select('_id')
+    .lean();
   if (!archived.length) return res.json({ ok: true });
 
   const now = Date.now();

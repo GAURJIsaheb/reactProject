@@ -21,13 +21,11 @@ const taskSchema = new mongoose.Schema({
   updatedAt:     { type: Number,  default: () => Date.now() },
 }, { versionKey: false });
 
-taskSchema.index({ workspaceId: 1, deleted: 1 });
-taskSchema.index({ sectionId: 1 });
+taskSchema.index({ sectionId: 1, deleted: 1 });
+taskSchema.index({ sectionId: 1, createdBy: 1, deleted: 1 });
 taskSchema.index({ deleted: 1, createdBy: 1 });
 taskSchema.index({ deleted: 1, updatedAt: -1 });
-taskSchema.index({ deleted: 1, createdAt: 1 });
 taskSchema.index({ deleted: 1, deletedAt: 1 });
-
 taskSchema.index({ workspaceId: 1, updatedAt: 1 });
 taskSchema.index({ workspaceId: 1, deleted: 1, updatedAt: -1 });
 export const Task = mongoose.model('tasks', taskSchema);

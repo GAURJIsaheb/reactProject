@@ -12,6 +12,7 @@ export default function HeaderSection({
   workspaceOptions,
   onAddWorkspace,
   onDeleteWorkspace,
+  isDeletingWorkspace,
   userName,
   theme,
   toggleTheme,
@@ -62,6 +63,7 @@ export default function HeaderSection({
             workspaceOptions={workspaceOptions}
             onAddWorkspace={onAddWorkspace}
             onDeleteWorkspace={onDeleteWorkspace}
+            isDeletingWorkspace={isDeletingWorkspace}
             onInvite={() => setShowInvite(true)}
             theme={theme}
           />

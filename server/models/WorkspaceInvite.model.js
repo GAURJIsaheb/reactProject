@@ -13,6 +13,7 @@ const workspaceInviteSchema = new mongoose.Schema(
   { versionKey: false }
 );
 
-workspaceInviteSchema.index({ workspaceId: 1, invitedEmail: 1 });
+workspaceInviteSchema.index({ workspaceId: 1, invitedEmail: 1, status: 1 });
+workspaceInviteSchema.index({ workspaceId: 1, status: 1, expiresAt: 1 });
 
 export const WorkspaceInvite = mongoose.model('workspaceinvites', workspaceInviteSchema);

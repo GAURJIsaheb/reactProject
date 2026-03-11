@@ -119,6 +119,7 @@ export function useTasksEngine() {
   const { userEmail, token } = useAuthStore();
 
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [isDeletingWorkspace, setIsDeletingWorkspace] = useState(false);
   const pendingTaskCreatesRef = useRef<Set<string>>(new Set());
   const [workspaceOptions, setWorkspaceOptions] = useState<WorkspaceOption[]>(() =>
     userEmail ? getInitialWorkspaceOptions(userEmail) : DEFAULT_WORKSPACES
@@ -273,6 +274,7 @@ export function useTasksEngine() {
     }
     if (!requireOnline("Delete Workspace")) return false;
 
+    setIsDeletingWorkspace(true);
     try {
       await deleteWorkspaceApi(activeWorkspaceOption.id, token);
       await clearWorkspaceDataFromIDB(userEmail, activeWorkspaceOption.value, activeWorkspaceOption.id);
@@ -286,6 +288,8 @@ export function useTasksEngine() {
     } catch {
       toast.error("Workspace delete failed");
       return false;
+    } finally {
+      setIsDeletingWorkspace(false);
     }
   }, [activeWorkspaceOption, token, userEmail]);
 
@@ -814,6 +818,7 @@ export function useTasksEngine() {
     workspaceOptions,
     addWorkspace,
     deleteWorkspace,
+    isDeletingWorkspace,
     createTask,
     toggleComplete,
     deleteTask,

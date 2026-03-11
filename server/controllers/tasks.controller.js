@@ -8,6 +8,7 @@ import {
 } from '../s3/s3Service.js';
 import { upsertTaskCompletedNotification } from './notifications.controller.js';
 import { getDefaultWorkspaceEmoji, normalizeWorkspaceType } from '../utils/workspaceDefaults.js';
+import { TASK_PUBLIC_PROJECTION } from '../utils/taskProjection.js';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -58,7 +59,10 @@ function normalizeLabels(labels) {
 
 async function ensureWorkspace(userId, workspaceType) {
   const type = normalizeWorkspaceType(workspaceType);
-  let workspace = await Workspace.findOne({ owner: userId, type, deleted: false }).lean();
+  let workspace = await Workspace.findOne(
+    { owner: userId, type, deleted: false },
+    { _id: 0, workspaceId: 1, type: 1 }
+  ).lean();
   if (workspace) return workspace;
 
   try {
@@ -72,43 +76,27 @@ async function ensureWorkspace(userId, workspaceType) {
     return workspace.toObject();
   } catch (err) {
     if (err?.code !== 11000) throw err;
-    return Workspace.findOne({ owner: userId, type, deleted: false }).lean();
+    return Workspace.findOne(
+      { owner: userId, type, deleted: false },
+      { _id: 0, workspaceId: 1, type: 1 }
+    ).lean();
   }
 }
 
 async function resolveWorkspace(userId, workspaceType, workspaceId) {
   if (workspaceId) {
-    return Workspace.findOne({
-      workspaceId,
-      deleted: false,
-      $or: [{ owner: userId }, { members: userId }],
-    }).lean();
+    return Workspace.findOne(
+      {
+        workspaceId,
+        deleted: false,
+        $or: [{ owner: userId }, { members: userId }],
+      },
+      { _id: 0, workspaceId: 1, type: 1 }
+    ).lean();
   }
 
   return ensureWorkspace(userId, workspaceType);
 }
-
-const TASK_PROJECTION = {
-  _id: 0,
-  taskId: 1,
-  workspaceId: 1,
-  sectionId: 1,
-  text: 1,
-  labels: 1,
-  image: 1,
-  imageUrl: 1,
-  imageUrlExpiry: 1,
-  reminderAt: 1,
-  completed: 1,
-  archived: 1,
-  deleted: 1,
-  deletedAt: 1,
-  createdBy: 1,
-  workspaceType: 1,
-  version: 1,
-  createdAt: 1,
-  updatedAt: 1,
-};
 
 async function broadcastTaskState(req, type, taskOrTasks) {
   const wsServer = req.app.get('wsServer');
@@ -138,7 +126,10 @@ export const createTask = async (req, res) => {
   const workspace = await resolveWorkspace(userId, normalizedWorkspaceType, workspaceId);
   if (!workspace) return res.status(404).json({ error: 'workspace not found' });
 
-  const existing = await Task.findOne({ taskId: id }).lean();
+  const existing = await Task.findOne(
+    { taskId: id },
+    { _id: 0, taskId: 1, image: 1, labels: 1, reminderAt: 1 }
+  ).lean();
   
   //Task created earlier without image → image arrives later.  — UPDATE 
   if (existing) {
@@ -265,27 +256,7 @@ export const getAllTasks = async (req, res) => {
 
   const tasks = await Task.find(
     { workspaceId: ws.workspaceId, deleted: false },
-    {
-      _id: 0,
-      taskId: 1,
-      workspaceId: 1,
-      sectionId: 1,
-      text: 1,
-      labels: 1,
-      image: 1,
-      imageUrl: 1,
-      imageUrlExpiry: 1,
-      reminderAt: 1,
-      completed: 1,
-      archived: 1,
-      deleted: 1,
-      deletedAt: 1,
-      createdBy: 1,
-      workspaceType: 1,
-      version: 1,
-      createdAt: 1,
-      updatedAt: 1,
-    }
+    TASK_PUBLIC_PROJECTION
   ).lean();
 
   res.json(tasks);
@@ -296,7 +267,9 @@ export const getAllTasks = async (req, res) => {
 export const updateTask = async (req, res) => {
   const { id: taskId } = req.params;
 
-  const task = await Task.findOne({ taskId });
+  const task = await Task.findOne({ taskId }).select(
+    'taskId text labels completed archived sectionId reminderAt image imageUrl imageUrlExpiry createdBy workspaceType workspaceId version'
+  );
   if (!task) return res.status(404).json({ error: 'Task not found' });
   const wasCompleted = task.completed;
 
@@ -407,7 +380,7 @@ export const bulkUpdateTasks = async (req, res) => {
 
   const updatedTasks = await Task.find(
     { taskId: { $in: updates.map((u) => u.taskId) } },
-    TASK_PROJECTION
+    TASK_PUBLIC_PROJECTION
   ).lean();
   await broadcastTaskState(req, 'TASK_UPDATE', updatedTasks);
 
@@ -495,27 +468,7 @@ export const syncTasks = async (req, res) => {
 
   const tasks = await Task.find(
     { workspaceId, updatedAt: { $gt: since } },
-    {
-      _id: 0,
-      taskId: 1,
-      workspaceId: 1,
-      sectionId: 1,
-      text: 1,
-      labels: 1,
-      image: 1,
-      imageUrl: 1,
-      imageUrlExpiry: 1,
-      reminderAt: 1,
-      completed: 1,
-      archived: 1,
-      deleted: 1,
-      deletedAt: 1,
-      createdBy: 1,
-      workspaceType: 1,
-      version: 1,
-      createdAt: 1,
-      updatedAt: 1,
-    }
+    TASK_PUBLIC_PROJECTION
   ).lean();
 
   const mapped = tasks.map(t => ({ ...t, id: t.taskId }));

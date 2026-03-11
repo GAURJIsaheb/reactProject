@@ -9,7 +9,9 @@ export async function syncNotifications(req, res) {
     createdBy: userId,
     workspaceType,
     updatedAt: { $gt: since },
-  }).lean();
+  })
+    .select('notificationId kind taskId taskText read deleted deletedAt createdAt updatedAt')
+    .lean();
 
   const mapped = notifications.map((n) => ({
     id: n.notificationId,

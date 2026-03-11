@@ -56,7 +56,7 @@ export default function NotificationsBell({
           onClick={() => setOpen((p) => !p)}
           aria-expanded={open}
           aria-haspopup="dialog"
-          className="w-9 h-9 rounded-xl flex items-center justify-center
+          className=" h-9 rounded-xl flex items-center justify-center w-full
           bg-background border border-border text-foreground"
         >
           <Bell size={15} />

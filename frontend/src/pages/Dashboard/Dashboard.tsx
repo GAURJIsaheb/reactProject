@@ -37,6 +37,7 @@ export default function Dashboard() {
     workspaceOptions,
     addWorkspace,
     deleteWorkspace,
+    isDeletingWorkspace,
     createTask,
     toggleComplete,
     deleteTask,
@@ -152,6 +153,7 @@ export default function Dashboard() {
         workspaceOptions={workspaceOptions}
         onAddWorkspace={handleAddWorkspace}
         onDeleteWorkspace={handleDeleteWorkspace}
+        isDeletingWorkspace={isDeletingWorkspace}
         userName={userName}
         theme={theme}
         toggleTheme={toggleTheme}
