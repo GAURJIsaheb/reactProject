@@ -10,5 +10,6 @@ const archiveSchema = new mongoose.Schema({
 }, { versionKey: false});
 
 archiveSchema.index({ userId: 1, restoredAt: 1 });
+archiveSchema.index({ workspaceId: 1, restoredAt: 1 });
 
 export const Archive = mongoose.model('archive', archiveSchema);

@@ -1,11 +1,8 @@
-
-// Core hook for archive/restore logic
-// Offline-first: IndexDB first, then sync to MongoDB
-
 import { useState, useCallback } from "react";
 import { useAuthStore } from "@/zustand/authStore";
 import type { Task } from "@/shared/types/task";
-import { deleteLocalTask, saveLocalTask } from "@/hooks/indexdbLayer"; 
+import { saveLocalTask } from "@/hooks/indexdbLayer";
+import { normalizeSubtasks } from "@/shared/lib/subtasks";
 
 import { encryptTask, decryptTask } from "./archiveService";
 import {
@@ -18,34 +15,75 @@ export interface ArchivedTask {
   id: string;
   userEmail: string;
   workspaceType: string;
+  workspaceId?: string | null;
   archived: true;
   encrypted: true;
   encryptedPayload: { iv: number[]; payload: number[] };
   archivedAt: number;
+  syncStatus?: "pending" | "synced";
 }
 
 import {
   apiArchiveTasks,
+  apiFetchArchivedTasks,
   apiRestoreTask,
   apiRestoreAllTasks,
 } from "../services/archive.service";
 
-export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
+type ArchiveContext = {
+  workspaceType: string;
+  workspaceId?: string | null;
+};
+
+export function useArchiveEngine(
+  onTasksChanged: () => Promise<void>,
+  context: ArchiveContext
+) {
   const { userEmail, token } = useAuthStore();
 
   const [archivedTasks, setArchivedTasks] = useState<ArchivedTask[]>([]);
   const [isArchiving, setIsArchiving] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
-  const [progress, setProgress] = useState(0); // 0-100
+  const [progress, setProgress] = useState(0);
 
-  // Load archived tasks from IndexDB
   const loadArchived = useCallback(async () => {
     if (!userEmail) return;
-    const data = await getAllArchivedTasks(userEmail);
-    setArchivedTasks(data);
-  }, [userEmail]);
 
-  // Archive selected tasks (single or multiple)
+    const localBefore = await getAllArchivedTasks(userEmail, context.workspaceType, context.workspaceId);
+
+    if (token && navigator.onLine) {
+      try {
+        const serverTasks = await apiFetchArchivedTasks(context, token);
+        const serverIds = new Set(serverTasks.map((task) => task.id));
+
+        for (const localTask of localBefore) {
+          if (localTask.syncStatus === "synced" && !serverIds.has(localTask.id)) {
+            await deleteArchivedFromDB(localTask.id);
+          }
+        }
+
+        for (const serverTask of serverTasks) {
+          await saveArchivedToDB({
+            ...serverTask,
+            userEmail,
+            workspaceType: context.workspaceType,
+            workspaceId: serverTask.workspaceId ?? context.workspaceId ?? null,
+            archived: true,
+            encrypted: true,
+            syncStatus: "synced",
+          });
+        }
+      } catch {
+        /* non-fatal */
+      }
+    }
+
+    const data = await getAllArchivedTasks(userEmail, context.workspaceType, context.workspaceId);
+    setArchivedTasks(
+      [...data].sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0))
+    );
+  }, [userEmail, token, context]);
+
   const archiveTasks = useCallback(
     async (tasks: Task[]) => {
       if (!userEmail || tasks.length === 0) return;
@@ -58,67 +96,69 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
 
       for (let i = 0; i < total; i++) {
         const task = tasks[i];
-
-        // image encrption of indexDb (for local restore )
-        const idbPayload = await encryptTask({
+        const encryptedPayload = await encryptTask({
           id: task.id,
           text: task.text,
+          labels: task.labels ?? [],
+          subtasks: normalizeSubtasks(task.subtasks),
           completed: task.completed,
           createdAt: task.createdAt,
           updatedAt: task.updatedAt,
           userEmail: task.userEmail,
           workspaceType: task.workspaceType,
+          workspaceId: task.workspaceId ?? context.workspaceId ?? null,
           image: task.image,
-          sectionId: task.sectionId ?? null, 
-        });
-
-        const serverPayload = await encryptTask({
-          id: task.id,
-          text: task.text,
-          completed: task.completed,
-          createdAt: task.createdAt,
-          updatedAt: task.updatedAt,
-          userEmail: task.userEmail,
-          workspaceType: task.workspaceType,
+          sectionId: task.sectionId ?? null,
+          reminderAt: task.reminderAt ?? null,
+          version: task.version,
         });
 
         const archiveRecord: ArchivedTask = {
           id: task.id,
           userEmail,
           workspaceType: task.workspaceType,
+          workspaceId: task.workspaceId ?? context.workspaceId ?? null,
           archived: true,
           encrypted: true,
-          encryptedPayload: idbPayload, 
+          encryptedPayload,
           archivedAt: Date.now(),
+          syncStatus: "pending",
         };
 
-        // Save to IndexDB archive store
         await saveArchivedToDB(archiveRecord);
-
-        // Remove from tasks IndexDB store
-        await deleteLocalTask(task.id);
+        await saveLocalTask({
+          ...task,
+          archived: true,
+          updatedAt: archiveRecord.archivedAt,
+          syncStatus: "pending",
+        });
 
         archiveRecords.push(archiveRecord);
         serverPayloads.push({
           id: task.id,
           userEmail,
           workspaceType: task.workspaceType,
-          encryptedPayload: serverPayload, 
+          workspaceId: task.workspaceId ?? context.workspaceId ?? null,
+          encryptedPayload,
           archivedAt: archiveRecord.archivedAt,
         });
 
         setProgress(Math.round(((i + 1) / total) * 100));
       }
 
-      setArchivedTasks((prev) => [...prev, ...archiveRecords]);
-
-      // Refresh dashboard tasks
+      setArchivedTasks((prev) =>
+        [...prev, ...archiveRecords].sort((a, b) => b.archivedAt - a.archivedAt)
+      );
       await onTasksChanged();
 
-      // Sync to MongoDB 
       if (token) {
         try {
           await apiArchiveTasks(serverPayloads, token);
+          await Promise.all(
+            archiveRecords.map((record) =>
+              saveArchivedToDB({ ...record, syncStatus: "synced" })
+            )
+          );
         } catch {
           console.log("archive: offline, will sync later");
         }
@@ -127,53 +167,58 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
       setIsArchiving(false);
       setProgress(0);
     },
-    [userEmail, token, onTasksChanged]
+    [userEmail, token, onTasksChanged, context]
   );
 
-  // Restore specific archived tasks
   const restoreTasks = useCallback(
-    async (archivedIds: string[]) => {
+    async (archivedIds: string[], syncServer = true) => {
       if (!userEmail || archivedIds.length === 0) return;
       setIsRestoring(true);
       setProgress(0);
 
-      const all = await getAllArchivedTasks(userEmail);
-      const toRestore = all.filter((a) => archivedIds.includes(a.id));
+      const all = await getAllArchivedTasks(userEmail, context.workspaceType, context.workspaceId);
+      const toRestore = all.filter((archive) => archivedIds.includes(archive.id));
       const total = toRestore.length;
 
       for (let i = 0; i < total; i++) {
         const record = toRestore[i];
-
-        // Decrypt
         const plain = await decryptTask<{
           id: string;
           text: string;
+          labels?: string[];
+          subtasks?: Task["subtasks"];
           completed: boolean;
           createdAt: number;
           updatedAt: number;
           userEmail: string;
           workspaceType: string;
+          workspaceId?: string | null;
           image: string | null;
           sectionId: string | null;
+          reminderAt?: number | null;
+          version?: number;
         }>(record.encryptedPayload);
 
-        // Restore to tasks IndexDB store
         await saveLocalTask({
           ...plain,
+          userEmail: plain.userEmail ?? userEmail,
+          workspaceType: plain.workspaceType ?? context.workspaceType,
+          workspaceId: plain.workspaceId ?? context.workspaceId ?? null,
+          labels: plain.labels ?? [],
+          subtasks: normalizeSubtasks(plain.subtasks),
           sectionId: plain.sectionId ?? null,
           archived: false,
           deleted: false,
-          deletedAt:  null,   
+          deletedAt: null,
           syncStatus: "pending",
+          version: plain.version ?? 1,
         });
 
-        // Remove from archive IndexDB store
         await deleteArchivedFromDB(record.id);
 
-        // Soft delete on MongoDB 
-        if (token) {
+        if (syncServer && token) {
           try {
-            await apiRestoreTask(record.id, token);
+            await apiRestoreTask(record.id, context, token);
           } catch {
             console.log("restore: offline, will sync later");
           }
@@ -188,26 +233,24 @@ export function useArchiveEngine(onTasksChanged: () => Promise<void>) {
       setIsRestoring(false);
       setProgress(0);
     },
-    [userEmail, token, loadArchived, onTasksChanged]
+    [userEmail, token, loadArchived, onTasksChanged, context]
   );
 
-  // Restore ALL archived tasks
   const restoreAllTasks = useCallback(async () => {
     if (!userEmail) return;
-    const all = await getAllArchivedTasks(userEmail);
-    const ids = all.map((a) => a.id);
+    const all = await getAllArchivedTasks(userEmail, context.workspaceType, context.workspaceId);
+    const ids = all.map((archive) => archive.id);
 
-    await restoreTasks(ids);
+    await restoreTasks(ids, false);
 
-    // Bulk restore on server
     if (token) {
       try {
-        await apiRestoreAllTasks(token);
+        await apiRestoreAllTasks(context, token);
       } catch {
         console.log("restore-all: offline, will sync later");
       }
     }
-  }, [userEmail, token, restoreTasks]);
+  }, [userEmail, token, restoreTasks, context]);
 
   return {
     archivedTasks,

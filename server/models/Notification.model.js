@@ -14,8 +14,7 @@ const notificationSchema = new mongoose.Schema({
   updatedAt: { type: Number, default: () => Date.now() },
 }, { versionKey: false });
 
-notificationSchema.index({ createdBy: 1, workspaceType: 1, deleted: 1 });
-notificationSchema.index({ createdBy: 1, updatedAt: -1 });
-notificationSchema.index({ deleted: 1, updatedAt: -1 });
+notificationSchema.index({ createdBy: 1, workspaceType: 1, updatedAt: 1 });
+notificationSchema.index({ createdBy: 1, workspaceType: 1, deleted: 1, read: 1 });
 
 export const Notification = mongoose.model('notifications', notificationSchema);

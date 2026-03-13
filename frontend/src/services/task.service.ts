@@ -1,7 +1,13 @@
 import { authHeaders } from "@/services/auth.service";
 import { addTask, pruneSyncedTasksMissingOnServer } from "@/infrastructure/lib/idb";
+import type { Task } from "@/shared/types/task";
+import { normalizeSubtasks } from "@/shared/lib/subtasks";
 
 const API_BASE = `http://${window.location.hostname}:4000`;
+
+function getErrorMessage(data: { error?: string; message?: string } | null | undefined, fallback: string) {
+  return data?.error || data?.message || fallback;
+}
 
 // For routes that may have an image - use FormData
 function buildFormData(data: Record<string, any>, imageFile?: File | null): FormData {
@@ -43,7 +49,12 @@ export async function fetchFromServer(
       await addTask({
         id,
         text: t.text,
-        image: t.imageUrl ?? t.image ?? null, // store signed URL locally
+        labels: t.labels ?? [],
+        subtasks: normalizeSubtasks(t.subtasks),
+        image: t.imageUrl ?? t.image ?? null, // signed URL if cached, otherwise S3 key
+        imageUrl: t.imageUrl ?? null,
+        imageUrlExpiry: t.imageUrlExpiry ?? null,
+        reminderAt: t.reminderAt ?? null,
         completed: t.completed,
         archived: t.archived,
         deleted: t.deleted,
@@ -51,9 +62,11 @@ export async function fetchFromServer(
         sectionId: t.sectionId ?? null,
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,
+        workspaceId: t.workspaceId ?? null,
         userEmail,
         workspaceType: workspace,
         syncStatus: "synced",
+        version: t.version ?? 1,
       });
     }
 
@@ -64,11 +77,54 @@ export async function fetchFromServer(
   }
 }
 
+export async function fetchTasksFromServer(
+  token: string,
+  workspaceType: string,
+  workspaceId?: string | null
+): Promise<Task[]> {
+  const params = new URLSearchParams({ workspaceType });
+  if (workspaceId) params.set("workspaceId", workspaceId);
+
+  const res = await fetch(`${API_BASE}/tasks?${params.toString()}`, {
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error("fetch failed");
+
+  const serverTasks = await res.json();
+  return serverTasks.map((t: any) => ({
+    id: t.taskId ?? t.id,
+    text: t.text,
+    labels: t.labels ?? [],
+    subtasks: normalizeSubtasks(t.subtasks),
+    completed: Boolean(t.completed),
+    archived: Boolean(t.archived),
+    deleted: Boolean(t.deleted),
+    deletedAt: t.deletedAt ?? null,
+    image: t.imageUrl ?? t.image ?? null,
+    imageUrl: t.imageUrl ?? null,
+    imageUrlExpiry: t.imageUrlExpiry ?? null,
+    reminderAt: t.reminderAt ?? null,
+    sectionId: t.sectionId ?? null,
+    createdAt: t.createdAt ?? Date.now(),
+    updatedAt: t.updatedAt ?? Date.now(),
+    userEmail: "",
+    workspaceType: t.workspaceType ?? workspaceType,
+    workspaceId: t.workspaceId ?? workspaceId ?? null,
+    syncStatus: "synced",
+    version: t.version ?? 1,
+    dirty: false,
+  }));
+}
+
 export async function apiCreateTask(task: any, token: string, imageFile?: File | null) {
   const fd = buildFormData({
     id: task.id,
     text: task.text,
     workspaceType: task.workspaceType,
+    workspaceId: task.workspaceId ?? null,
+    reminderAt: task.reminderAt ?? null,
+    labels: JSON.stringify(task.labels ?? []),
+    subtasks: JSON.stringify(task.subtasks ?? []),
     ...(task.sectionId ? { sectionId: task.sectionId } : {}), // empty string nahi
   }, imageFile);
 
@@ -78,8 +134,21 @@ export async function apiCreateTask(task: any, token: string, imageFile?: File |
     body: fd,
   });
 
-  if (!res.ok) throw new Error("create failed");
-  return res.json();
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(getErrorMessage(data, "create failed"));
+  return data;
+}
+
+export async function apiBulkCreateTasks(tasks: any[], token: string) {
+  const res = await fetch(`${API_BASE}/tasks/bulk-create`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({ tasks }),
+  });
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(getErrorMessage(data, "bulk create failed"));
+  return data;
 }
 
 
@@ -101,8 +170,9 @@ export async function apiUpdateTask(
     body: fd,
   });
 
-  if (!res.ok) throw new Error("update failed");
-  return res.json();
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(getErrorMessage(data, "update failed"));
+  return data;
 }
 
 export async function apiDeleteTask(id: string, token: string) {
@@ -112,4 +182,13 @@ export async function apiDeleteTask(id: string, token: string) {
   });
 
   if (!res.ok) throw new Error("delete failed");
+}
+
+export async function apiFetchTaskImageUrl(id: string, token: string) {
+  const res = await fetch(`${API_BASE}/tasks/${id}/image-url`, {
+    headers: authHeaders(token),
+  });
+
+  if (!res.ok) throw new Error("image url fetch failed");
+  return res.json() as Promise<{ imageUrl: string | null; imageUrlExpiry: number | null }>;
 }

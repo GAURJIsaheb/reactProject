@@ -14,10 +14,12 @@ export interface ArchivedTask {
   id: string;
   userEmail: string;
   workspaceType: string;
+  workspaceId?: string | null;
   archived: true;
   encrypted: true;
   encryptedPayload: EncryptedPayload;
   archivedAt: number;
+  syncStatus?: "pending" | "synced";
 }
 
 export async function saveArchivedTask(task: ArchivedTask): Promise<void> {

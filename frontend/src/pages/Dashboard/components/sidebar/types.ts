@@ -14,6 +14,8 @@ export type HeaderProps = {
   setWorkspace: (v: string) => void;
   workspaceOptions: WorkspaceOption[];
   onAddWorkspace: (name: string, emoji: string) => void;
+  onDeleteWorkspace: () => Promise<boolean>;
+  isDeletingWorkspace: boolean;
 
   userName?: string | null;
   theme: string;

@@ -7,7 +7,12 @@ const SECRET = process.env.SECRET;
 
 export function signToken(user){
   return jwt.sign(
-    { email: user.email, name: user.name, userId: user.userId }, 
+    {
+      email: user.email,
+      name: user.name,
+      userId: user.userId,
+      role: user.role ?? "user",
+    },
     SECRET,
     { expiresIn:"1d" }
   );

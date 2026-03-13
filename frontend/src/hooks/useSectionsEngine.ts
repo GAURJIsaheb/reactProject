@@ -1,12 +1,18 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
+import { toast } from "sonner";
 import { useAuthStore } from "@/zustand/authStore";
 import type { Section } from "@/shared/types/section";
 import {
   getAllSections,
   upsertSection,
   deleteSectionFromIDB,
+  pruneSyncedSectionsMissingOnServer,
 } from "@/infrastructure/lib/idb";
+import {
+  readCachedSections,
+  writeCachedSections,
+} from "@/infrastructure/cache/workspaceCache";
 import {
   fetchSections,
   createSectionApi,
@@ -14,108 +20,366 @@ import {
   deleteSectionApi,
 } from "@/services/section.service";
 
-export function useSectionsEngine(workspaceType: string) {
-  const { token, userEmail } = useAuthStore();
-  const [sections, setSections] = useState<Section[]>([]);
+type SendWsFn = (msg: object) => void;
 
-  // Load from IDB first, then sync from server
+type Props = {
+  workspaceType: string;
+  /** Server-side workspaceId — present only for collab (shared) workspaces */
+  workspaceId:   string | null;
+  sharedMode:    boolean;
+  sendWs:        SendWsFn;
+};
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+function requireOnline(action: string): boolean {
+  if (!navigator.onLine) {
+    toast.warning(`You're offline — "${action}" requires an internet connection in shared workspaces.`);
+    return false;
+  }
+  return true;
+}
+
+// ── hook ─────────────────────────────────────────────────────────────────────
+export function useSectionsEngine({ workspaceType, workspaceId, sharedMode, sendWs }: Props) {
+  const { token, userEmail } = useAuthStore();
+  const effectiveWorkspaceId = workspaceId ?? null;
+  const [sections, setSections] = useState<Section[]>(() => {
+    if (!userEmail) return [];
+    return readCachedSections(userEmail, workspaceType, effectiveWorkspaceId);
+  });
+  const pendingSectionCreatesRef = useRef<Set<string>>(new Set());
+
+  // Keep a ref so the WS handler can read latest sections without going stale
+  const sectionsRef = useRef<Section[]>(sections);
+  sectionsRef.current = sections;
+
+  useEffect(() => {
+    if (!userEmail) return;
+    const cached = readCachedSections(userEmail, workspaceType, effectiveWorkspaceId);
+    if (cached.length > 0) {
+      setSections(cached);
+      return;
+    }
+
+    setSections([]);
+  }, [userEmail, workspaceType, effectiveWorkspaceId]);
+
+  useEffect(() => {
+    if (!userEmail) return;
+    writeCachedSections(userEmail, workspaceType, sections, effectiveWorkspaceId);
+  }, [effectiveWorkspaceId, sections, userEmail, workspaceType]);
+
+  const syncDirtySections = useCallback(
+    async (localSections: Section[]) => {
+      if (!token) return;
+
+      for (const section of localSections) {
+        if (!section.dirty) continue;
+
+        try {
+          await createSectionApi(token, {
+            id: section.id,
+            title: section.title,
+            workspaceType: section.workspaceType,
+            order: section.order,
+            workspaceId: effectiveWorkspaceId ?? undefined,
+          });
+        } catch {
+          try {
+            await updateSectionApi(token, section.id, {
+              title: section.title,
+              order: section.order,
+              workspaceId: effectiveWorkspaceId ?? undefined,
+            });
+          } catch {
+            continue;
+          }
+        }
+
+        await upsertSection({ ...section, dirty: false, updatedAt: Date.now() });
+      }
+    },
+    [effectiveWorkspaceId, token]
+  );
+
+  // ── Load & server sync ─────────────────────────────────────────────────────
   const loadSections = useCallback(async () => {
     if (!userEmail) return;
+    if (sharedMode) {
+      if (!workspaceId) {
+        setSections([]);
+        return;
+      }
 
-    // Optimistic: load from IDB immediately
-    const local = await getAllSections(userEmail, workspaceType);
+      const local = await getAllSections(userEmail, workspaceType, workspaceId);
+      setSections(local);
+      return;
+    }
+
+    // Optimistic: IDB first
+    const local = await getAllSections(userEmail, workspaceType, effectiveWorkspaceId);
     setSections(local);
 
-    // Then sync from server
     if (!token) return;
     try {
-      const remote = await fetchSections(token, workspaceType);
+      await syncDirtySections(local);
+
+      // Pass workspaceId so server can query the collab workspace correctly
+      const remote = await fetchSections(token, workspaceType, effectiveWorkspaceId ?? undefined);
+
       for (const s of remote) {
-        await upsertSection({ ...s, userEmail });
+        // Persist workspaceId on every section so the byWorkspaceId IDB index
+        // stays populated for collab workspaces (receiver's persistence fix)
+        await upsertSection({ ...s, userEmail, workspaceType, ...(effectiveWorkspaceId ? { workspaceId: effectiveWorkspaceId } : {}) });
       }
-      const merged = await getAllSections(userEmail, workspaceType);
+
+      const serverIds = remote.map((s: Section) => s.id);
+      await pruneSyncedSectionsMissingOnServer(userEmail, workspaceType, serverIds, effectiveWorkspaceId);
+
+      const merged = await getAllSections(userEmail, workspaceType, effectiveWorkspaceId);
       setSections(merged);
     } catch {
       // Offline — keep IDB data
     }
-  }, [token, userEmail, workspaceType]);
+  }, [token, userEmail, workspaceType, effectiveWorkspaceId, sharedMode, workspaceId, syncDirtySections]);
 
   useEffect(() => {
     loadSections();
   }, [loadSections]);
 
+  // ── Incoming WS handler ────────────────────────────────────────────────────
+  // Called by useTasksEngine when a SECTION_* WS message arrives
+  const handleWsSection = useCallback(
+    async (type: string, payload: unknown) => {
+      if (type === "SECTION_CREATE" || type === "SECTION_UPDATE") {
+        const incoming = payload as Section;
+
+        // OCC: only apply if incoming is newer
+        const existing = sectionsRef.current.find((s) => s.id === incoming.id);
+        if (existing && existing.updatedAt >= incoming.updatedAt) return;
+
+        const toSave = {
+          ...incoming,
+          userEmail: userEmail!,
+          workspaceType,
+          ...(effectiveWorkspaceId ? { workspaceId: effectiveWorkspaceId } : {}),
+        };
+        await upsertSection({ ...toSave, dirty: false });
+        setSections((prev) => {
+          const filtered = prev.filter((s) => s.id !== incoming.id);
+          return [...filtered, toSave].sort(
+            (a, b) => (a.order ?? 0) - (b.order ?? 0)
+          );
+        });
+      }
+
+      if (type === "SECTION_DELETE") {
+        const sectionId = payload as string;
+        if (!sharedMode) await deleteSectionFromIDB(sectionId);
+        setSections((prev) => prev.filter((s) => s.id !== sectionId));
+      }
+    },
+    [effectiveWorkspaceId, userEmail, workspaceType, sharedMode]
+  );
+
+  // ── CRUD ───────────────────────────────────────────────────────────────────
   const createSection = useCallback(
     async (title: string) => {
       if (!userEmail) return;
+      const trimmedTitle = title.trim();
+      if (!trimmedTitle) return;
+      const requestKey = `${sharedMode ? workspaceId ?? "shared" : workspaceType}:${trimmedTitle.toLowerCase()}`;
+      if (pendingSectionCreatesRef.current.has(requestKey)) return;
 
+      // Online-only for collab workspaces
+      if (sharedMode && !requireOnline("Add Section")) return;
+
+      if (sharedMode) {
+        if (!token || !workspaceId) return;
+        pendingSectionCreatesRef.current.add(requestKey);
+        try {
+          const created = await createSectionApi(token, {
+            id: uuidv4(),
+            title: trimmedTitle,
+            workspaceType,
+            order: sections.length,
+            workspaceId,
+          });
+          const nextSection = {
+            ...created,
+            userEmail: created.userEmail || userEmail,
+            workspaceType,
+            workspaceId,
+            dirty: false,
+          };
+          await upsertSection(nextSection);
+          setSections((prev) =>
+            [...prev.filter((section) => section.id !== nextSection.id), nextSection].sort(
+              (a, b) => (a.order ?? 0) - (b.order ?? 0)
+            )
+          );
+        } catch {
+          toast.error("Section couldn't be created");
+        } finally {
+          pendingSectionCreatesRef.current.delete(requestKey);
+        }
+        return;
+      }
+
+      pendingSectionCreatesRef.current.add(requestKey);
       const newSection: Section = {
-        id: uuidv4(),
-        title,
+        id:            uuidv4(),
+        title:         trimmedTitle,
         workspaceType: workspaceType as Section["workspaceType"],
         userEmail,
-        order: sections.length,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        order:         sections.length,
+        createdAt:     Date.now(),
+        updatedAt:     Date.now(),
+        dirty:         true,
       };
 
       // Optimistic update
       await upsertSection(newSection);
       setSections((prev) => [...prev, newSection]);
 
-      // Sync to server
       if (token) {
         try {
           await createSectionApi(token, {
-            id: newSection.id,
-            title: newSection.title,
+            id:            newSection.id,
+            title:         newSection.title,
             workspaceType: newSection.workspaceType,
-            order: newSection.order,
+            order:         newSection.order,
+            workspaceId:   effectiveWorkspaceId ?? undefined,
           });
+
+          // Broadcast to collab peers
+          if (sharedMode && workspaceId) {
+            sendWs({
+              type:        "SECTION_CREATE",
+              workspaceId,
+              section:     newSection,
+            });
+          }
+          await upsertSection({ ...newSection, dirty: false });
         } catch {
-          // Will remain in IDB for next sync
+          // Personal workspace — stays in IDB for next sync
+          // Collab workspace — show error (optimistic UI stays, but peers won't see it)
+          if (sharedMode) {
+            toast.error("Section couldn't sync. Reload to check consistency.");
+          }
+        } finally {
+          pendingSectionCreatesRef.current.delete(requestKey);
         }
+      } else {
+        pendingSectionCreatesRef.current.delete(requestKey);
       }
     },
-    [token, userEmail, workspaceType, sections.length]
+    [token, userEmail, workspaceType, workspaceId, effectiveWorkspaceId, sections.length, sendWs, sharedMode]
   );
 
   const renameSection = useCallback(
     async (sectionId: string, title: string) => {
-      const updated = { updatedAt: Date.now(), title };
+      if (sharedMode && !requireOnline("Rename Section")) return;
+      if (sharedMode) {
+        if (!token || !workspaceId) return;
+        const existing = sectionsRef.current.find((s) => s.id === sectionId);
+        if (!existing) return;
+        try {
+          await updateSectionApi(token, sectionId, { title, workspaceId });
+          const updated = { ...existing, title, updatedAt: Date.now(), dirty: false };
+          await upsertSection(updated);
+          setSections((prev) => prev.map((s) => (s.id === sectionId ? updated : s)));
+        } catch {
+          toast.error("Section rename failed");
+        }
+        return;
+      }
+
+      const now     = Date.now();
+      const updated = { updatedAt: now, title, dirty: true };
 
       setSections((prev) =>
         prev.map((s) => (s.id === sectionId ? { ...s, ...updated } : s))
       );
 
-      const existing = sections.find((s) => s.id === sectionId);
+      const existing = sectionsRef.current.find((s) => s.id === sectionId);
       if (existing) await upsertSection({ ...existing, ...updated });
 
       if (token) {
         try {
-          await updateSectionApi(token, sectionId, { title });
+          await updateSectionApi(token, sectionId, {
+            title,
+            workspaceId: effectiveWorkspaceId ?? undefined,
+          });
+          if (existing) await upsertSection({ ...existing, ...updated, dirty: false });
+
+          if (sharedMode && workspaceId) {
+            sendWs({
+              type:        "SECTION_UPDATE",
+              workspaceId,
+              section:     { ...existing, ...updated },
+            });
+          }
         } catch {}
       }
     },
-    [token, sections]
+    [effectiveWorkspaceId, token, workspaceId, sendWs, sharedMode]
   );
 
   const deleteSection = useCallback(
     async (sectionId: string) => {
+      if (sharedMode && !requireOnline("Delete Section")) return;
+      if (sharedMode) {
+        if (!token || !workspaceId) return;
+        try {
+          await deleteSectionApi(token, sectionId, workspaceId);
+          await deleteSectionFromIDB(sectionId);
+          setSections((prev) => prev.filter((s) => s.id !== sectionId));
+        } catch {
+          toast.error("Section delete failed");
+        }
+        return;
+      }
+
       await deleteSectionFromIDB(sectionId);
       setSections((prev) => prev.filter((s) => s.id !== sectionId));
 
       if (token) {
         try {
-          await deleteSectionApi(token, sectionId);
+          await deleteSectionApi(token, sectionId, effectiveWorkspaceId ?? undefined);
+
+          if (sharedMode && workspaceId) {
+            sendWs({
+              type:        "SECTION_DELETE",
+              workspaceId,
+              sectionId,
+            });
+          }
         } catch {}
       }
     },
-    [token]
+    [token, workspaceId, effectiveWorkspaceId, sendWs, sharedMode]
   );
 
   const reorderSections = useCallback(
     async (reordered: Section[]) => {
-      const withOrder = reordered.map((s, i) => ({ ...s, order: i }));
+      if (sharedMode && !requireOnline("Reorder Sections")) return;
+      if (sharedMode) {
+        if (!token || !workspaceId) return;
+        const withOrder = reordered.map((s, i) => ({ ...s, order: i, updatedAt: Date.now(), dirty: false }));
+        try {
+          await Promise.all(
+            withOrder.map((s) => updateSectionApi(token, s.id, { order: s.order, workspaceId }))
+          );
+          await Promise.all(withOrder.map((section) => upsertSection(section)));
+          setSections(withOrder);
+        } catch {
+          toast.error("Section reorder failed");
+        }
+        return;
+      }
+
+      const withOrder = reordered.map((s, i) => ({ ...s, order: i, updatedAt: Date.now(), dirty: true }));
       setSections(withOrder);
 
       for (const s of withOrder) {
@@ -125,13 +389,36 @@ export function useSectionsEngine(workspaceType: string) {
       if (token) {
         try {
           await Promise.all(
-            withOrder.map((s) => updateSectionApi(token, s.id, { order: s.order }))
+            withOrder.map((s) =>
+              updateSectionApi(token, s.id, {
+                order: s.order,
+                workspaceId: effectiveWorkspaceId ?? undefined,
+              })
+            )
           );
+          for (const s of withOrder) {
+            await upsertSection({ ...s, dirty: false });
+          }
+
+          // Broadcast each reordered section to peers
+          if (sharedMode && workspaceId) {
+            for (const s of withOrder) {
+              sendWs({ type: "SECTION_UPDATE", workspaceId, section: s });
+            }
+          }
         } catch {}
       }
     },
-    [token]
+    [effectiveWorkspaceId, token, workspaceId, sendWs, sharedMode]
   );
 
-  return { sections, createSection, renameSection, deleteSection, reorderSections, loadSections };
+  return {
+    sections,
+    createSection,
+    renameSection,
+    deleteSection,
+    reorderSections,
+    loadSections,
+    handleWsSection,   
+  };
 }

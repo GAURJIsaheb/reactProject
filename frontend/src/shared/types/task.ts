@@ -1,24 +1,31 @@
-export interface Task {
+
+export interface TaskSubtask {
   id: string;
   text: string;
-  image: string | null;       // S3 key (stored in DB)
-  imageUrl?: string | null;   // signed URL (for display)
   completed: boolean;
-  archived: boolean;
-  deleted: boolean;
-  deletedAt?: number | null;
-  sectionId?: string | null;
-  createdAt: number;
-  updatedAt: number;
-  userEmail: string;
-  workspaceType: string;
-  syncStatus: 'synced' | 'pending';
+}
 
-    /**
-   * Optimistic concurrency version — mirrors the server schema.
-   * Starts at 1 on create, bumped on every local mutation.
-   * The server rejects writes where incoming version !== storedVersion + 1.
-   * Optional so existing IDB records without the field don't break.
-   */
-  version?: number;
+export interface Task {
+  id:            string;
+  text:          string;
+  labels:        string[];
+  subtasks:      TaskSubtask[];
+  completed:     boolean;
+  archived:      boolean;
+  deleted:       boolean;
+  deletedAt:     number | null;
+  image:         string | null;
+  imageUrl?:     string | null;
+  imageUrlExpiry?: number | null;
+  reminderAt?:   number | null;
+  sectionId:     string | null;
+  createdAt:     number;
+  updatedAt:     number;
+  userEmail:     string;
+  workspaceType: string;
+  /** Server-side workspace UUID — set for collab workspaces so IDB byWorkspaceId index works */
+  workspaceId?:  string | null;
+  syncStatus:    "pending" | "synced";
+  version:       number;
+  dirty?:        boolean;
 }

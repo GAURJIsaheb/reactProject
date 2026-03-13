@@ -16,6 +16,35 @@ router.delete("/:id",    asyncHandler(deleteSection));
 
 export default router;
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /*
 Suppose frontend does:
 

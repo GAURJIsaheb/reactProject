@@ -7,6 +7,8 @@ import { useAuthStore } from "./zustand/authStore";
 import AdminDashboard from "./Admin/adminDashboard";
 import ResetPassword from "./pages/ResetPassword/ResetPassword";
 import ForgotPassword from "./pages/ForgotPassword/ForgotPassword";
+import InviteAccept from "./pages/InviteAccept/InviteAccept";
+import CalendarPage from "./pages/Calendar/Calendar";
 
 
 
@@ -33,7 +35,7 @@ function App() {
       });
       if (!res.ok) throw new Error("auth/me failed");
       const data = await res.json();
-      setAuth(token, data.user.name, data.user.email, data.user.userId);
+      setAuth(token, data.user.name, data.user.email, data.user.userId ,data.user.role);
 
       // ── Step 2: Check admin role from /auth/me response  ────────
 
@@ -88,6 +90,10 @@ function App() {
         <Route path="*" element={
           <Navigate to={!token ? "/login" : isAdmin ? "/admin" : "/dashboard"} />
         } />
+
+        <Route path="/invite/accept" element={<InviteAccept />} />
+
+        <Route path="/calendar" element={<CalendarPage />} />
       </Routes>
     </BrowserRouter>
   );

@@ -7,9 +7,10 @@ import adminRoutes from './admin.routes.js'
 import cronAdminRouter from './cronAdmin.routes.js';
 import { requireAuth } from '../middlewares/requireAuth.js';
 import { requireSuperAdmin } from '../middlewares/requireSuperAdmin.js';
-
+import workspaceRoutes    from './workspace.routes.js'; 
 export function registerRoutes(app) {
   app.use('/password', passwordRoutes);//public routes,,bcz we have public endpoints like forgot password
+  app.use('/workspace', workspaceRoutes);
 
   //protected routes
   app.use(requireAuth);
@@ -17,6 +18,7 @@ export function registerRoutes(app) {
   app.use('/archive', archiveRoutes);
   app.use('/sections', sectionRoutes);
   app.use('/notifications', notificationRoutes);
+  
 
   app.use('/admin',           requireSuperAdmin,adminRoutes);
   app.use('/admin/crons',     requireSuperAdmin,cronAdminRouter);

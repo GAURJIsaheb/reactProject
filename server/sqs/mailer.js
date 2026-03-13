@@ -60,3 +60,88 @@ export async function sendResetEmail({ to, resetUrl, userName }) {
 
   console.log(`📧 Reset email sent to: ${to}`);
 }
+
+
+
+
+// ─── Workspace Invite ─────────────────────────────────────────────────────────
+export async function sendInviteEmail({ to, inviterName, workspaceName, inviteLink }) {
+  await transporter.sendMail({
+    from:    `"FlowTask" <${process.env.MAIL_USER}>`,
+    to,
+    subject: `${inviterName} invited you to collaborate on FlowTask`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8" /></head>
+      <body style="font-family:sans-serif;background:#0f1117;color:#e2e8f0;padding:40px;">
+        <div style="max-width:480px;margin:0 auto;background:#1a1f2e;border-radius:16px;
+                    padding:32px;border:1px solid #2d3348;">
+          <!-- Header -->
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
+            <tr>
+              <td>
+                <div style="display:inline-block;
+                            background:linear-gradient(90deg,#a5b4fc,#f9a8d4);
+                            padding:6px 14px;
+                            border-radius:8px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td style="vertical-align:middle;">
+                        <div style="width:34px;height:34px;border-radius:8px;
+                                    background:linear-gradient(135deg,#6366f1,#ec4899);
+                                    text-align:center;line-height:34px;">
+                          <span style="font-size:18px;">⚓</span>
+                        </div>
+                      </td>
+
+                      <td style="vertical-align:middle;padding-left:8px;">
+                        <span style="font-size:18px;font-weight:800;color:#1e293b;">
+                          FlowTask
+                        </span>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+              </td>
+            </tr>
+          </table>
+
+          <h2 style="color:#f1f5f9;margin-top:0;font-size:20px;">
+            You've been invited to collaborate
+          </h2>
+
+          <p style="color:#94a3b8;line-height:1.6;">
+            <strong style="color:#e2e8f0;">${inviterName}</strong> has invited you to join the
+            <strong style="color:#818cf8;">${workspaceName}</strong> workspace on FlowTask.
+          </p>
+
+          <a href="${inviteLink}"
+             style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);
+                    color:#fff;padding:13px 28px;border-radius:12px;
+                    text-decoration:none;font-weight:700;font-size:14px;margin:20px 0;">
+            ✉️ Accept Invitation
+          </a>
+
+          <div style="background:#0f1117;border-radius:10px;padding:14px 16px;
+                      border:1px solid #2d3348;margin-top:8px;">
+            <p style="margin:0;font-size:12px;color:#475569;">
+              Or paste this link in your browser:
+            </p>
+            <p style="margin:6px 0 0;font-size:11px;color:#6366f1;word-break:break-all;">
+              ${inviteLink}
+            </p>
+          </div>
+
+          <p style="color:#475569;font-size:12px;margin-top:24px;border-top:1px solid #1e2535;padding-top:16px;">
+            This invite expires in <strong>7 days</strong>.
+            If you weren't expecting this, you can safely ignore it.
+          </p>
+        </div>
+      </body>
+      </html>
+    `,
+  });
+
+  console.log(`📧 Invite email sent to: ${to}`);
+}

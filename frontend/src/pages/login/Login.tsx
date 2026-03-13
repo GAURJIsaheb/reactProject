@@ -55,10 +55,18 @@ export default function Login() {
         data.token,
         data.user.name,
         data.user.email,
-        data.user.userId
+        data.user.userId,
+        data.user.role,
+
       );
 
+  const pendingInvite = sessionStorage.getItem("pendingInviteUrl");
+if (pendingInvite) {
+  sessionStorage.removeItem("pendingInviteUrl");
+  window.location.href = pendingInvite;
+} else {
   window.location.reload();
+}
 } catch (err: any) {
       setError(err.message || "Login failed. Please try again.");
     } finally {

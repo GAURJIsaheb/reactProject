@@ -5,8 +5,18 @@ interface AuthState {
   token: string | null;
   userName: string | null;
   userEmail: string | null;
-  userId: string | null; 
-  setAuth: (token: string, name: string, email: string, userId: string) => void; 
+  userId: string | null;
+  role: string | null;
+
+  setAuth: (
+    token: string,
+    name: string,
+    email: string,
+    userId: string,
+    role: string,
+    
+  ) => void;
+
   logout: () => Promise<void>;
 }
 
@@ -15,24 +25,41 @@ export const useAuthStore = create<AuthState>((set) => ({
   userName: localStorage.getItem("userName"),
   userEmail: localStorage.getItem("userEmail"),
   userId: localStorage.getItem("userId"),
+  role: localStorage.getItem("role"),
 
-  setAuth: (token, name, email, userId) => {
+  setAuth: (token, name, email, userId, role) => {
     localStorage.setItem("token", token);
     localStorage.setItem("userName", name);
     localStorage.setItem("userEmail", email);
-    localStorage.setItem("userId", userId); 
+    localStorage.setItem("userId", userId);
+    localStorage.setItem("role", role);
 
-    set({ token, userName: name, userEmail: email, userId }); 
+    set({
+      token,
+      userName: name,
+      userEmail: email,
+      userId,
+      role,
+    });
   },
 
   logout: async () => {
-     clearSyncTimestamps(); 
+    clearSyncTimestamps();
+
     localStorage.removeItem("token");
     localStorage.removeItem("userName");
     localStorage.removeItem("userEmail");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("role");
 
-    set({ token:null, userName:null, userEmail:null });
+    set({
+      token: null,
+      userName: null,
+      userEmail: null,
+      userId: null,
+      role: null,
+    });
 
-    window.location.href="/login";
+    window.location.href = "/login";
   },
 }));

@@ -17,9 +17,11 @@ import { useArchiveEngine } from "./archiveEngine";
 interface ArchiveProps {
   tasks: Task[];
   onTasksChanged: () => Promise<void>;
+  workspace: string;
+  workspaceId?: string | null;
 }
 
-export default function Archive({ tasks, onTasksChanged }: ArchiveProps) {
+export default function Archive({ tasks, onTasksChanged, workspace, workspaceId }: ArchiveProps) {
   const [open, setOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [restoringIds, setRestoringIds] = useState<Set<string>>(new Set());
@@ -34,11 +36,11 @@ export default function Archive({ tasks, onTasksChanged }: ArchiveProps) {
     restoreTasks,
     restoreAllTasks,
     loadArchived,
-  } = useArchiveEngine(onTasksChanged);
+  } = useArchiveEngine(onTasksChanged, { workspaceType: workspace, workspaceId });
 
   useEffect(() => {
     if (open) loadArchived();
-  }, [open, loadArchived]);
+  }, [open, loadArchived, tasks]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -150,7 +152,7 @@ export default function Archive({ tasks, onTasksChanged }: ArchiveProps) {
                       onClick={() => toggleSelect(task.id)}
                       className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-left border transition-all duration-150 ${
                         isSelected
-                          ? "bg-amber-500/10 border-amber-400/40 text-amber-200"
+                          ? "bg-amber-500/10 border-amber-400/40 text-foreground"
                           : "bg-background/40 border-border/50 text-foreground hover:border-border"
                       }`}
                     >
@@ -187,7 +189,7 @@ export default function Archive({ tasks, onTasksChanged }: ArchiveProps) {
                 <button
                   onClick={handleArchive}
                   disabled={busy}
-                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 text-sm font-semibold hover:bg-amber-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
+                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-foreground text-sm font-semibold hover:bg-amber-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
                 >
                   {isArchiving ? (
                     <>
@@ -196,7 +198,7 @@ export default function Archive({ tasks, onTasksChanged }: ArchiveProps) {
                     </>
                   ) : (
                     <>
-                      <Lock size={14} />
+                      <Lock size={14} className="text-foreground"/>
                       Archive {selectedIds.size} task{selectedIds.size > 1 ? "s" : ""}
                     </>
                   )}

@@ -6,14 +6,19 @@ import { addTask, upsertQueue } from "@/infrastructure/lib/idb";
 import { apiUpdateTask } from "@/services/task.service";
 
 import type { Task } from "@/shared/types/task";
+import type { TaskSubtask } from "@/shared/types/task";
+import { hasIncompleteSubtasks, normalizeSubtasks } from "@/shared/lib/subtasks";
 import taskAddSound from "@/assests/taskadd.wav";
 import taskDeleteSound from "@/assests/deleteTask.wav";
+
 type Props = {
   input: string;
   setInput: (v: string) => void;
 
   imageFile: File | null;
   setImageFile: (f: File | null) => void;
+  labelsInput: string;
+  setLabelsInput: (v: string) => void;
   reminderDate: string;
   setReminderDate: (v: string) => void;
   reminderTime: string;
@@ -27,8 +32,14 @@ type Props = {
 
   tasks: Task[];
 
-  createTask: (text: string, image: File | null, sectionId: string) => Promise<Task>;
-  onTaskReminderSet: (taskId: string, taskText: string, dueAt: number | null) => void;
+  createTask: (
+    text: string,
+    image: File | null,
+    sectionId: string,
+    reminderAt?: number | null,
+    labels?: string[],
+    subtasks?: Pick<TaskSubtask, "text">[]
+  ) => Promise<Task | null>;
   deleteTask: (id: string) => void;
   reloadTasks: () => Promise<void>;
 
@@ -39,22 +50,31 @@ type Props = {
   taskInputRef: React.RefObject<HTMLInputElement | null>;
 };
 
-
-
 function playSuccessSound() {
-  try {
-    const audio = new Audio(taskAddSound);
-    audio.play();
-  } catch {// Audio not available — silently skip
-  }
+  try { new Audio(taskAddSound).play(); } catch { /* silent */ }
 }
 
 function deleteTaskSound() {
-  try {
-    const audio = new Audio(taskDeleteSound);
-    audio.play();
-  } catch {// Audio not available — silently skip
+  try { new Audio(taskDeleteSound).play(); } catch { /* silent */ }
+}
+
+function normalizeLabelsInput(value: string): string[] {
+  const seen = new Set<string>();
+  const labels: string[] = [];
+
+  for (const part of value.split(",")) {
+    const label = part.trim().replace(/\s+/g, " ").slice(0, 24);
+    if (!label) continue;
+
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    labels.push(label);
+
+    if (labels.length === 3) break;
   }
+
+  return labels;
 }
 
 export function useTaskActions({
@@ -62,6 +82,8 @@ export function useTaskActions({
   setInput,
   imageFile,
   setImageFile,
+  labelsInput,
+  setLabelsInput,
   reminderDate,
   setReminderDate,
   reminderTime,
@@ -72,7 +94,6 @@ export function useTaskActions({
   hasNoSections,
   tasks,
   createTask,
-  onTaskReminderSet,
   deleteTask,
   reloadTasks,
   workspace,
@@ -83,12 +104,9 @@ export function useTaskActions({
   const resolveReminderAt = useCallback((): number | null => {
     if (!reminderDate && !reminderTime) return null;
     if (!reminderDate || !reminderTime) return NaN;
-
     const dueAt = new Date(`${reminderDate}T${reminderTime}:00`).getTime();
     return Number.isFinite(dueAt) ? dueAt : NaN;
   }, [reminderDate, reminderTime]);
-
-  // ─── ADD TASK ─────────────────────────────────────────────
 
   const handleAdd = useCallback(async () => {
     const trimmed = input.trim();
@@ -96,11 +114,13 @@ export function useTaskActions({
 
     const targetSectionId = activeSectionId ?? sections[0]?.id ?? null;
     if (!targetSectionId) return;
+    const labels = normalizeLabelsInput(labelsInput);
+    if (labelsInput.trim() && labels.length === 0) {
+      toast.error("Enter valid labels separated by commas");
+      return;
+    }
 
-    // Pass raw File — NO base64 conversion
-    const fileToUpload = imageFile ?? null;
     const reminderAt = resolveReminderAt();
-
     if (Number.isNaN(reminderAt)) {
       toast.error("Reminder date and time both required");
       return;
@@ -112,127 +132,211 @@ export function useTaskActions({
 
     setInput("");
     setImageFile(null);
+    setLabelsInput("");
     setReminderDate("");
     setReminderTime("");
 
-    const createdTask = await createTask(trimmed, fileToUpload, targetSectionId);
-    onTaskReminderSet(createdTask.id, trimmed, reminderAt);
+    const createdTask = await createTask(
+      trimmed,
+      imageFile ?? null,
+      targetSectionId,
+      reminderAt,
+      labels
+    );
+    if (!createdTask) return;
 
     playSuccessSound();
-
-    toast.success("✨ Task added!", {
-      description: `"${trimmed}"`,
-      duration: 2500,
-    });
-
+    toast.success("Task added", { description: `"${trimmed}"`, duration: 2500 });
   }, [
     input,
-    imageFile,
+    hasNoSections,
     activeSectionId,
     sections,
-    hasNoSections,
-    createTask,
-    reminderDate,
-    reminderTime,
     resolveReminderAt,
+    setInput,
+    setImageFile,
+    labelsInput,
+    setLabelsInput,
     setReminderDate,
     setReminderTime,
-    onTaskReminderSet,
+    createTask,
+    imageFile,
   ]);
-
-  // ─── DELETE TASK ──────────────────────────────────────────
 
   const handleDelete = useCallback((id: string) => {
     const task = tasks.find((t) => t.id === id);
     deleteTask(id);
-
     deleteTaskSound();
-
-    toast.success("🧹 Task deleted", {
+    toast.success("Task deleted", {
       description: task ? `"${task.text}"` : "Task removed",
       duration: 2500,
     });
   }, [tasks, deleteTask]);
 
-  // ─── EDIT SAVE ────────────────────────────────────────────
+  const handleAddFromSpeech = useCallback(async (spokenText: string) => {
+    if (hasNoSections) return null;
+    const trimmed = spokenText.trim();
+    if (!trimmed) {
+      toast.error("No speech detected. Please try again.");
+      return null;
+    }
+
+    const targetSectionId = activeSectionId ?? sections[0]?.id ?? null;
+    if (!targetSectionId) return null;
+
+    const labels = normalizeLabelsInput(labelsInput);
+    if (labelsInput.trim() && labels.length === 0) {
+      toast.error("Enter valid labels separated by commas");
+      return null;
+    }
+
+    const reminderAt = resolveReminderAt();
+    if (Number.isNaN(reminderAt)) {
+      toast.error("Reminder date and time both required");
+      return null;
+    }
+    if (reminderAt !== null && reminderAt <= Date.now()) {
+      toast.error("Reminder time should be in future");
+      return null;
+    }
+
+    setInput(trimmed);
+    const createdTask = await createTask(
+      trimmed,
+      null,
+      targetSectionId,
+      reminderAt,
+      labels
+    );
+    if (!createdTask) return null;
+
+    setInput("");
+    setImageFile(null);
+    setLabelsInput("");
+    setReminderDate("");
+    setReminderTime("");
+
+    playSuccessSound();
+    toast.success("Task added", { description: `"${createdTask.text}"`, duration: 2500 });
+    return createdTask;
+  }, [
+    hasNoSections,
+    activeSectionId,
+    sections,
+    labelsInput,
+    resolveReminderAt,
+    createTask,
+    setInput,
+    setImageFile,
+    setLabelsInput,
+    setReminderDate,
+    setReminderTime,
+  ]);
 
   const handleEditSave = useCallback(
     async (
       id: string,
       text: string,
+      labels: string[],
+      subtasks: TaskSubtask[],
       imageFile?: File | null,
-      removeImage?: boolean
+      removeImage?: boolean,
+      reminderAt?: number | null
     ): Promise<boolean> => {
       if (!userEmail) return false;
+      const existingTask = tasks.find((task) => task.id === id) ?? null;
+      const shouldForceIncomplete = hasIncompleteSubtasks(subtasks);
 
-      // IDB optimistic update — clear image if removing, keep existing if no change
-      const idbUpdate: any = {
+      const idbUpdate: Partial<Task> = {
         id,
         text,
         userEmail,
         workspaceType: workspace,
         updatedAt: Date.now(),
+        labels,
+        subtasks,
+        reminderAt,
+        completed: shouldForceIncomplete ? false : existingTask?.completed,
         dirty: true,
       };
       if (removeImage) idbUpdate.image = null;
-
       await addTask(idbUpdate);
 
-      // Queue for offline retry
       await upsertQueue({
         id: uuidv4(),
         action: "update",
         taskId: id,
         userEmail,
         workspaceType: workspace,
-        payload: { text, ...(removeImage ? { image: null } : {}) },
+        payload: {
+          text,
+          labels,
+          subtasks,
+          reminderAt,
+          ...(shouldForceIncomplete ? { completed: false } : {}),
+          ...(removeImage ? { image: null } : {}),
+        },
         retry: 0,
         nextRetry: Date.now(),
       });
 
-      // Online push via FormData
       try {
         if (token) {
-          const result = await apiUpdateTask(id, { text }, token, imageFile, removeImage);
-
-          // Update IDB with fresh signed URL from server
-          if (result?.task?.imageUrl) {
-            await addTask({ id, image: result.task.imageUrl });
-          }
+          const result = await apiUpdateTask(
+            id,
+            {
+              text,
+              labels: JSON.stringify(labels),
+              subtasks: JSON.stringify(subtasks),
+              reminderAt,
+              ...(shouldForceIncomplete ? { completed: false } : {}),
+            },
+            token,
+            imageFile,
+            removeImage
+          );
+          await addTask({
+            id,
+            text: result?.task?.text ?? text,
+            labels: result?.task?.labels ?? labels,
+            subtasks: normalizeSubtasks(result?.task?.subtasks ?? subtasks),
+            image: result?.task?.imageUrl ?? result?.task?.image ?? idbUpdate.image ?? null,
+            imageUrl: result?.task?.imageUrl ?? null,
+            imageUrlExpiry: result?.task?.imageUrlExpiry ?? null,
+            reminderAt: result?.task?.reminderAt ?? reminderAt ?? null,
+            completed: result?.task?.completed ?? idbUpdate.completed ?? false,
+            updatedAt: result?.task?.updatedAt ?? Date.now(),
+            dirty: false,
+            syncStatus: "synced",
+            version: result?.task?.version ?? 1,
+          });
         }
       } catch {
-        // offline — queue handles it
+        /* offline - queue handles it */
       }
 
       await reloadTasks();
       return true;
     },
-    [userEmail, workspace, token, reloadTasks]
+    [reloadTasks, tasks, token, userEmail, workspace]
   );
-
-  // ─── CLICK +ADD INSIDE COLUMN ─────────────────────────────
 
   const handleTaskAddInSection = useCallback((sectionId: string) => {
     setActiveSectionId(sectionId);
-    requestAnimationFrame(() => {
-      taskInputRef.current?.focus();
-    });
-  }, []);
+    requestAnimationFrame(() => { taskInputRef.current?.focus(); });
+  }, [setActiveSectionId, taskInputRef]);
 
-  const handleClearSection = useCallback(() => {
-    setActiveSectionId(null);
-  }, []);
+  const handleClearSection = useCallback(() => { setActiveSectionId(null); }, [setActiveSectionId]);
 
   const handleCreateFirstSection = useCallback(
-    (createSection: (t: string) => void) => {
-      createSection("My Tasks");
-    },
+    (createSection: (t: string) => void) => { createSection("My Tasks"); },
     []
   );
 
   return {
     handleAdd,
     handleDelete,
+    handleAddFromSpeech,
     handleEditSave,
     handleTaskAddInSection,
     handleClearSection,

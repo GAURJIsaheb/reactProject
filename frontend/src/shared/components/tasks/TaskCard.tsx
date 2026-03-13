@@ -1,6 +1,9 @@
-import { useMemo, useState } from "react";
-import { Trash2, Check } from "lucide-react";
+import { memo, useMemo, useState } from "react";
+import { Trash2, Check, ListTodo, Sparkles } from "lucide-react";
 import type { Task } from "@/shared/types/task";
+import { useAuthStore } from "@/zustand/authStore";
+import { apiFetchTaskImageUrl } from "@/services/task.service";
+import { getSubtaskProgressLabel, hasIncompleteSubtasks } from "@/shared/lib/subtasks";
 
 const CARD_PALETTES = [
   {
@@ -71,7 +74,7 @@ interface Props {
   dragHandleProps?: React.HTMLAttributes<HTMLElement>;
 }
 
-export default function TaskCard({
+function TaskCard({
   task,
   index,
   onDelete,
@@ -81,10 +84,19 @@ export default function TaskCard({
   isJustCompleted = false,
   reminderLabel,
 }: Props) {
+  const { token } = useAuthStore();
   const palette = getPalette(index);
   const isCompleted = task.completed;
   const hasImage = Boolean(task.imageUrl || task.image);
+  const subtaskProgress = getSubtaskProgressLabel(task.subtasks);
+  const hasOpenSubtasks = hasIncompleteSubtasks(task.subtasks);
   const [showImage, setShowImage] = useState(false);
+  const [loadingImage, setLoadingImage] = useState(false);
+  const [resolvedImageUrl, setResolvedImageUrl] = useState<string | null>(
+    (task.imageUrl && /^https?:\/\//.test(task.imageUrl))
+      ? task.imageUrl
+      : (task.image && /^https?:\/\//.test(task.image) ? task.image : null)
+  );
   const { title, description } = useMemo(() => {
     const raw = (task.text ?? "").trim();
     const lines = raw
@@ -103,7 +115,7 @@ export default function TaskCard({
     <div
       onClick={(e) => {
         if ((e.target as HTMLElement).closest("button,[role=menuitem]")) return;
-        if (!isCompleted) onView(task);
+        onView(task);
       }}
       className={[
         "relative flex flex-col gap-3 p-4 rounded-2xl border-2",
@@ -203,7 +215,26 @@ export default function TaskCard({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setShowImage((prev) => !prev);
+                const next = !showImage;
+                setShowImage(next);
+
+                if (
+                  next &&
+                  !resolvedImageUrl &&
+                  task.image &&
+                  token &&
+                  !loadingImage
+                ) {
+                  setLoadingImage(true);
+                  apiFetchTaskImageUrl(task.id, token)
+                    .then((data) => {
+                      if (data.imageUrl) setResolvedImageUrl(data.imageUrl);
+                    })
+                    .catch(() => {
+                      // non-blocking UI action
+                    })
+                    .finally(() => setLoadingImage(false));
+                }
               }}
               className={`text-[11px] font-semibold underline underline-offset-2 ${
                 isCompleted ? "text-gray-500" : palette.sub
@@ -214,13 +245,19 @@ export default function TaskCard({
           </div>
           {showImage && (
             <div className={`flex justify-center ${isCompleted ? "opacity-60" : ""}`}>
-              <img
-                src={task.imageUrl ?? task.image!}
-                alt="attachment"
-                loading="lazy"
-                decoding="async"
-                className="w-[75%] aspect-video object-cover rounded-sm shadow-sm"
-              />
+              {resolvedImageUrl ? (
+                <img
+                  src={resolvedImageUrl}
+                  alt="attachment"
+                  loading="lazy"
+                  decoding="async"
+                  className="w-[75%] aspect-video object-cover rounded-sm shadow-sm"
+                />
+              ) : (
+                <div className="text-[11px] text-muted-foreground py-2">
+                  {loadingImage ? "Loading image..." : "Image unavailable"}
+                </div>
+              )}
             </div>
           )}
         </>
@@ -235,6 +272,36 @@ export default function TaskCard({
           }`}
         >
           Reminder: {reminderLabel}
+        </div>
+      )}
+
+      {!!task.labels?.length && (
+        <div className="flex flex-wrap gap-1.5">
+          {task.labels.map((label) => (
+            <span
+              key={label}
+              className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-semibold border ${
+                isCompleted
+                  ? "border-gray-300/70 text-gray-500 bg-white/50"
+                  : `${palette.border} ${palette.text} bg-white/45`
+              }`}
+            >
+              #{label}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {subtaskProgress && (
+        <div
+          className={`inline-flex items-center self-start gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold border ${
+            hasOpenSubtasks
+              ? "border-amber-300/70 bg-amber-100/70 text-amber-800"
+              : "border-emerald-300/70 bg-emerald-100/70 text-emerald-800"
+          }`}
+        >
+          {hasOpenSubtasks ? <ListTodo size={11} /> : <Sparkles size={11} />}
+          {subtaskProgress}
         </div>
       )}
 
@@ -280,3 +347,5 @@ export default function TaskCard({
     </div>
   );
 }
+
+export default memo(TaskCard);
