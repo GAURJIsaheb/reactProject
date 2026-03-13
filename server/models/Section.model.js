@@ -16,7 +16,5 @@ const sectionSchema = new mongoose.Schema({
 
 sectionSchema.index({ owner: 1, workspaceType: 1, deleted: 1, order: 1 });
 sectionSchema.index({ workspaceId: 1, deleted: 1, order: 1 });
-sectionSchema.index({ owner: 1, workspaceType: 1, updatedAt: 1 });
-sectionSchema.index({ workspaceId: 1, deleted: 1, updatedAt: 1 });
 
 export const Section = mongoose.model("sections", sectionSchema);

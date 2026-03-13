@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { useAuthStore } from "@/zustand/authStore";
 import type { Task } from "@/shared/types/task";
 import { saveLocalTask } from "@/hooks/indexdbLayer";
+import { normalizeSubtasks } from "@/shared/lib/subtasks";
 
 import { encryptTask, decryptTask } from "./archiveService";
 import {
@@ -99,6 +100,7 @@ export function useArchiveEngine(
           id: task.id,
           text: task.text,
           labels: task.labels ?? [],
+          subtasks: normalizeSubtasks(task.subtasks),
           completed: task.completed,
           createdAt: task.createdAt,
           updatedAt: task.updatedAt,
@@ -184,6 +186,7 @@ export function useArchiveEngine(
           id: string;
           text: string;
           labels?: string[];
+          subtasks?: Task["subtasks"];
           completed: boolean;
           createdAt: number;
           updatedAt: number;
@@ -202,6 +205,7 @@ export function useArchiveEngine(
           workspaceType: plain.workspaceType ?? context.workspaceType,
           workspaceId: plain.workspaceId ?? context.workspaceId ?? null,
           labels: plain.labels ?? [],
+          subtasks: normalizeSubtasks(plain.subtasks),
           sectionId: plain.sectionId ?? null,
           archived: false,
           deleted: false,

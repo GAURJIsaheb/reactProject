@@ -113,6 +113,7 @@ export default function HeaderSection({
         <InviteModal
           workspaceId={currentWsId}
           workspaceName={currentWsLabel}
+          isOwner={Boolean(currentOption?.isOwner)}
           onClose={() => setShowInvite(false)}
         />
       )}

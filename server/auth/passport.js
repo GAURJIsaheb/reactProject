@@ -23,7 +23,7 @@ passport.use(
         if (!ok) return done(null, false, { message: "Wrong password" });
 
 
-      //return done(error,  {userobject})--> if error is null and user is valid then it will return user details in req.user
+//return done(error,  {userobject})--> if error is null and user is valid then it will return user details in req.user
         return done(null, {
           email: user.email,
           name: user.name,

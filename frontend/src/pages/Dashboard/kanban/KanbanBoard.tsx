@@ -18,6 +18,7 @@ import { spawnConfetti } from "./kanbanConfetti";
 import { useKanbanDrag } from "./useKanbanDrag";
 import KanbanAddSection from "./KanbanAddSection";
 import KanbanDragOverlay from "./KanbanDragOverlay";
+import { hasIncompleteSubtasks } from "@/shared/lib/subtasks";
 
 interface Props {
   sections: Section[];
@@ -107,7 +108,7 @@ export default function KanbanBoard(props: Props) {
 
   const handleToggle = (id: string, e?: React.MouseEvent) => {
     const task = drag.localTasks.find((t) => t.id === id);
-    if (task && !task.completed && e) {
+    if (task && !task.completed && !hasIncompleteSubtasks(task.subtasks) && e) {
       spawnConfetti(e.clientX, e.clientY);
       setJustCompleted((prev) => new Set([...prev, id]));
       setTimeout(() => {

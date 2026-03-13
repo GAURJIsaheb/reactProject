@@ -3,16 +3,20 @@ import mongoose from "mongoose";
 
 import { Workspace } from "../models/Workspace.model.js";
 import { WorkspaceInvite } from "../models/WorkspaceInvite.model.js";
+import { User } from "../models/User.model.js";
 import { Task } from "../models/Task.model.js";
 import { Section } from "../models/Section.model.js";
-import { Archive } from "../models/Archive.model.js";
 import { sendInviteEmail } from "../sqs/mailer.js";
 import { asyncHandler } from "../tryCatch/async.js";
 import {
+  getWorkspaceDisplayName,
   getDefaultWorkspaceEmoji,
   isDefaultWorkspaceType,
 } from "../utils/workspaceDefaults.js";
+import { bumpWorkspaceSync } from "../utils/workspaceSync.js";
 
+
+//helpers
 function getCallerId(req) {
   const raw = req.user?.userId ?? req.user?._id;
   if (!raw) return null;
@@ -29,6 +33,25 @@ function resolveWorkspaceEmoji(name, emoji) {
   return getDefaultWorkspaceEmoji(name);
 }
 
+function formatWorkspaceMember(user) {
+  if (!user?._id) return null;
+
+  const email = String(user.email ?? "").trim().toLowerCase();
+  const fallbackName = email ? email.split("@")[0] : "Member";
+  const name = String(user.name ?? "").trim() || fallbackName;
+
+  return {
+    _id: user._id.toString(),
+    name,
+    email,
+  };
+}
+
+function isWorkspaceMember(value) {
+  return Boolean(value?._id && value.email);
+}
+
+//controllers
 export const createWorkspace = asyncHandler(async (req, res) => {
   const { name, emoji } = req.body;
   const ownerId = getCallerId(req);
@@ -44,8 +67,11 @@ export const createWorkspace = asyncHandler(async (req, res) => {
   const workspaceId = `${slug}-${crypto.randomBytes(4).toString("hex")}`;
   const emojiToSave = resolveWorkspaceEmoji(trimmedName, emoji);
 
-  const existing = await Workspace.findOne({ owner: ownerId, type: trimmedName, deleted: false })
-    .select('workspaceId emoji updatedAt');
+  const existing = await Workspace.findOne({
+    owner: ownerId,
+    deleted: false,
+    name: trimmedName,
+  }).select('workspaceId name type emoji updatedAt');//id,emoji,updateAt
   if (existing) {
     if (existing.emoji !== emojiToSave) {
       existing.emoji = emojiToSave;
@@ -58,7 +84,8 @@ export const createWorkspace = asyncHandler(async (req, res) => {
   await Workspace.create({
     workspaceId,
     owner: ownerId,
-    type: trimmedName,
+    name: trimmedName,
+    type: "custom",
     emoji: emojiToSave,
     members: [],
   });
@@ -74,12 +101,13 @@ export const listMyWorkspaces = asyncHandler(async (req, res) => {
     deleted: false,
     $or: [{ owner: callerId }, { members: callerId }],
   })
-    .select('workspaceId type emoji owner members')
+    .select('workspaceId name type emoji owner members')
     .lean();
 
   return res.status(200).json({
     workspaces: workspaces.map((workspace) => ({
       workspaceId: workspace.workspaceId,
+      name: getWorkspaceDisplayName(workspace),
       type: workspace.type,
       emoji: workspace.emoji || getDefaultWorkspaceEmoji(workspace.type),
       isOwner: workspace.owner.toString() === callerId.toString(),
@@ -127,7 +155,16 @@ export const deleteWorkspace = asyncHandler(async (req, res) => {
         WorkspaceInvite.deleteMany({ workspaceId }, { session }),
         Workspace.updateOne(
           { workspaceId, deleted: false },
-          { $set: { deleted: true, deletedAt: now, updatedAt: now, members: [] } },
+          {
+            $set: {
+              deleted: true,
+              deletedAt: now,
+              updatedAt: now,
+              members: [],
+              lastChangedAt: now,
+            },
+            $inc: { syncVersion: 1 },
+          },
           { session }
         ),
       ]);
@@ -136,7 +173,7 @@ export const deleteWorkspace = asyncHandler(async (req, res) => {
     await session.endSession();
   }
 
-  req.app.get("wsServer")?.broadcastToWorkspace(workspaceId, {
+  req.app.get("wsServer")?.broadcastToWorkspace(workspaceId, {//websocket notification
     type: "WORKSPACE_DELETED",
     workspaceId,
   });
@@ -147,13 +184,14 @@ export const deleteWorkspace = asyncHandler(async (req, res) => {
 export const inviteMember = asyncHandler(async (req, res) => {
   const { workspaceId, invitedEmail } = req.body;
   const inviterId = getCallerId(req);
+  const normalizedEmail = String(invitedEmail ?? "").trim().toLowerCase();
 
-  if (!workspaceId || !invitedEmail) {
+  if (!workspaceId || !normalizedEmail) {
     return res.status(400).json({ error: "workspaceId and invitedEmail are required" });
   }
 
   const workspace = await Workspace.findOne({ workspaceId, deleted: false })
-    .select('owner members type')
+    .select('owner members name type')
     .lean();
   if (!workspace) return res.status(404).json({ error: "Workspace not found" });
 
@@ -164,19 +202,40 @@ export const inviteMember = asyncHandler(async (req, res) => {
     return res.status(403).json({ error: "Not authorised to invite" });
   }
 
-  await WorkspaceInvite.updateMany(
-    { workspaceId, invitedEmail: invitedEmail.toLowerCase(), status: "pending" },
+  const invitedUser = await User.findOne({
+    email: normalizedEmail,
+    role: "user",
+  })
+    .select("_id email role")
+    .lean();
+  if (!invitedUser) {
+    return res.status(404).json({ error: "User account not found for this email" });
+  }
+
+  if (workspace.owner.toString() === invitedUser._id.toString()) {
+    return res.status(400).json({ error: "Workspace owner is already part of this workspace" });
+  }
+
+  const isAlreadyMember = workspace.members.some(
+    (member) => member.toString() === invitedUser._id.toString()
+  );
+  if (isAlreadyMember) {
+    return res.status(400).json({ error: "User is already a member of this workspace" });
+  }
+
+  await WorkspaceInvite.updateMany(//expire previous pending invites
+    { workspaceId, invitedEmail: normalizedEmail, status: "pending" },
     { status: "expired" }
   );
 
   const token = crypto.randomBytes(32).toString("hex");
-  const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+  const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;//ttL
 
   await WorkspaceInvite.create({
     token,
     workspaceId,
     invitedBy: inviterId,
-    invitedEmail: invitedEmail.toLowerCase(),
+    invitedEmail: normalizedEmail,
     expiresAt,
   });
 
@@ -184,9 +243,9 @@ export const inviteMember = asyncHandler(async (req, res) => {
   const inviteLink = `${process.env.FRONTEND_URL}/invite/accept?token=${token}`;
 
   await sendInviteEmail({
-    to: invitedEmail,
+    to: normalizedEmail,
     inviterName: inviter,
-    workspaceName: workspace.type,
+    workspaceName: getWorkspaceDisplayName(workspace),
     inviteLink,
   });
 
@@ -223,7 +282,7 @@ export const acceptInvite = asyncHandler(async (req, res) => {
   }
 
   const workspace = await Workspace.findOne({ workspaceId: invite.workspaceId, deleted: false })
-    .select('type members updatedAt');
+    .select('name type members updatedAt');
   if (!workspace) return res.status(404).json({ error: "Workspace no longer exists" });
 
   const alreadyMember = workspace.members.some((member) => member.equals(userId));
@@ -231,6 +290,7 @@ export const acceptInvite = asyncHandler(async (req, res) => {
     workspace.members.push(userId);
     workspace.updatedAt = Date.now();
     await workspace.save();
+    await bumpWorkspaceSync(invite.workspaceId);
   }
 
   invite.status = "accepted";
@@ -247,26 +307,50 @@ export const acceptInvite = asyncHandler(async (req, res) => {
   return res.status(200).json({
     message: "Joined workspace successfully",
     workspaceId: invite.workspaceId,
-    workspaceName: workspace.type,
+    workspaceName: getWorkspaceDisplayName(workspace),
   });
 });
 
 export const getMembers = asyncHandler(async (req, res) => {
   const { workspaceId } = req.params;
+  const requesterId = getCallerId(req);
 
-  const workspace = await Workspace.findOne({ workspaceId, deleted: false })
-    .select('owner members')
-    .populate("owner", "name email _id")
-    .populate("members", "name email _id")
+  if (!requesterId) return res.status(401).json({ error: "Not authenticated" });
+
+  const workspace = await Workspace.findOne({
+    workspaceId,
+    deleted: false,
+    $or: [{ owner: requesterId }, { members: requesterId }],
+  })
+    .select("owner members")
     .lean();
 
   if (!workspace) return res.status(404).json({ error: "Workspace not found" });
 
-  const ownerId = workspace.owner._id.toString();
-  const members = workspace.members.filter((member) => member._id.toString() !== ownerId);
+  const ownerId = workspace.owner?.toString?.() ?? String(workspace.owner ?? "");
+  const memberIds = Array.isArray(workspace.members)
+    ? workspace.members.map((memberId) => memberId?.toString?.() ?? String(memberId ?? "")).filter(Boolean)
+    : [];
+  const userIds = [...new Set([ownerId, ...memberIds])];
+
+  const users = await User.find(
+    { _id: { $in: userIds } },
+    "name email _id"
+  ).lean();
+
+  const usersById = new Map(users.map((user) => [user._id.toString(), user]));
+  const owner = formatWorkspaceMember(
+    usersById.get(ownerId) ?? { _id: ownerId, name: "Owner", email: "" }
+  );
+
+  const members = memberIds
+    .map((memberId) =>
+      formatWorkspaceMember(usersById.get(memberId) ?? { _id: memberId, name: "Member", email: "" })
+    )
+    .filter((member) => isWorkspaceMember(member) && member._id !== owner?._id);
 
   return res.status(200).json({
-    owner: workspace.owner,
+    owner,
     members,
   });
 });
@@ -286,6 +370,7 @@ export const removeMember = asyncHandler(async (req, res) => {
   workspace.members = workspace.members.filter((member) => !member.equals(memberId));
   workspace.updatedAt = Date.now();
   await workspace.save();
+  await bumpWorkspaceSync(workspaceId);
 
   req.app.get("wsServer")?.broadcastToWorkspace(workspaceId, {
     type: "MEMBER_REMOVED",
@@ -301,7 +386,7 @@ export const getPendingInvites = asyncHandler(async (req, res) => {
   const requesterId = getCallerId(req);
 
   const workspace = await Workspace.findOne({ workspaceId, deleted: false })
-    .select('owner')
+    .select("owner")
     .lean();
   if (!workspace) return res.status(404).json({ error: "Workspace not found" });
 
@@ -314,7 +399,8 @@ export const getPendingInvites = asyncHandler(async (req, res) => {
     status: "pending",
     expiresAt: { $gt: Date.now() },
   })
-    .select("invitedEmail createdAt expiresAt")
+    .select("token invitedEmail createdAt expiresAt")
+    .sort({ createdAt: -1 })
     .lean();
 
   return res.status(200).json({ invites });
@@ -325,7 +411,7 @@ export const revokeInvite = asyncHandler(async (req, res) => {
   const requesterId = getCallerId(req);
 
   const workspace = await Workspace.findOne({ workspaceId, deleted: false })
-    .select('owner')
+    .select("owner")
     .lean();
   if (!workspace) return res.status(404).json({ error: "Workspace not found" });
 
@@ -339,4 +425,27 @@ export const revokeInvite = asyncHandler(async (req, res) => {
   );
 
   return res.status(200).json({ message: "Invite revoked" });
+});
+
+export const getWorkspaceSyncState = asyncHandler(async (req, res) => {
+  const { workspaceId } = req.params;
+  const requesterId = getCallerId(req);
+
+  if (!requesterId) return res.status(401).json({ error: "Not authenticated" });
+
+  const workspace = await Workspace.findOne({
+    workspaceId,
+    deleted: false,
+    $or: [{ owner: requesterId }, { members: requesterId }],
+  })
+    .select("workspaceId syncVersion lastChangedAt")
+    .lean();
+
+  if (!workspace) return res.status(404).json({ error: "Workspace not found" });
+
+  return res.status(200).json({
+    workspaceId: workspace.workspaceId,
+    syncVersion: workspace.syncVersion ?? 0,
+    lastChangedAt: workspace.lastChangedAt ?? 0,
+  });
 });

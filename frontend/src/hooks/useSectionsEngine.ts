@@ -10,6 +10,10 @@ import {
   pruneSyncedSectionsMissingOnServer,
 } from "@/infrastructure/lib/idb";
 import {
+  readCachedSections,
+  writeCachedSections,
+} from "@/infrastructure/cache/workspaceCache";
+import {
   fetchSections,
   createSectionApi,
   updateSectionApi,
@@ -38,13 +42,32 @@ function requireOnline(action: string): boolean {
 // ── hook ─────────────────────────────────────────────────────────────────────
 export function useSectionsEngine({ workspaceType, workspaceId, sharedMode, sendWs }: Props) {
   const { token, userEmail } = useAuthStore();
-  const [sections, setSections] = useState<Section[]>([]);
-  const effectiveWorkspaceId = sharedMode ? workspaceId : null;
+  const effectiveWorkspaceId = workspaceId ?? null;
+  const [sections, setSections] = useState<Section[]>(() => {
+    if (!userEmail) return [];
+    return readCachedSections(userEmail, workspaceType, effectiveWorkspaceId);
+  });
   const pendingSectionCreatesRef = useRef<Set<string>>(new Set());
 
   // Keep a ref so the WS handler can read latest sections without going stale
   const sectionsRef = useRef<Section[]>(sections);
   sectionsRef.current = sections;
+
+  useEffect(() => {
+    if (!userEmail) return;
+    const cached = readCachedSections(userEmail, workspaceType, effectiveWorkspaceId);
+    if (cached.length > 0) {
+      setSections(cached);
+      return;
+    }
+
+    setSections([]);
+  }, [userEmail, workspaceType, effectiveWorkspaceId]);
+
+  useEffect(() => {
+    if (!userEmail) return;
+    writeCachedSections(userEmail, workspaceType, sections, effectiveWorkspaceId);
+  }, [effectiveWorkspaceId, sections, userEmail, workspaceType]);
 
   const syncDirtySections = useCallback(
     async (localSections: Section[]) => {
@@ -83,27 +106,13 @@ export function useSectionsEngine({ workspaceType, workspaceId, sharedMode, send
   const loadSections = useCallback(async () => {
     if (!userEmail) return;
     if (sharedMode) {
-      if (!token || !workspaceId) {
+      if (!workspaceId) {
         setSections([]);
         return;
       }
 
-      try {
-        const remote = await fetchSections(token, workspaceType, workspaceId);
-        setSections(
-          remote
-            .map((section) => ({
-              ...section,
-              userEmail: section.userEmail || userEmail,
-              workspaceType,
-              workspaceId,
-              dirty: false,
-            }))
-            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-        );
-      } catch {
-        // Keep current in-memory state if refresh fails
-      }
+      const local = await getAllSections(userEmail, workspaceType, workspaceId);
+      setSections(local);
       return;
     }
 
@@ -155,7 +164,7 @@ export function useSectionsEngine({ workspaceType, workspaceId, sharedMode, send
           workspaceType,
           ...(effectiveWorkspaceId ? { workspaceId: effectiveWorkspaceId } : {}),
         };
-        if (!sharedMode) await upsertSection(toSave);
+        await upsertSection({ ...toSave, dirty: false });
         setSections((prev) => {
           const filtered = prev.filter((s) => s.id !== incoming.id);
           return [...filtered, toSave].sort(
@@ -203,6 +212,7 @@ export function useSectionsEngine({ workspaceType, workspaceId, sharedMode, send
             workspaceId,
             dirty: false,
           };
+          await upsertSection(nextSection);
           setSections((prev) =>
             [...prev.filter((section) => section.id !== nextSection.id), nextSection].sort(
               (a, b) => (a.order ?? 0) - (b.order ?? 0)
@@ -277,6 +287,7 @@ export function useSectionsEngine({ workspaceType, workspaceId, sharedMode, send
         try {
           await updateSectionApi(token, sectionId, { title, workspaceId });
           const updated = { ...existing, title, updatedAt: Date.now(), dirty: false };
+          await upsertSection(updated);
           setSections((prev) => prev.map((s) => (s.id === sectionId ? updated : s)));
         } catch {
           toast.error("Section rename failed");
@@ -296,7 +307,10 @@ export function useSectionsEngine({ workspaceType, workspaceId, sharedMode, send
 
       if (token) {
         try {
-          await updateSectionApi(token, sectionId, { title });
+          await updateSectionApi(token, sectionId, {
+            title,
+            workspaceId: effectiveWorkspaceId ?? undefined,
+          });
           if (existing) await upsertSection({ ...existing, ...updated, dirty: false });
 
           if (sharedMode && workspaceId) {
@@ -309,7 +323,7 @@ export function useSectionsEngine({ workspaceType, workspaceId, sharedMode, send
         } catch {}
       }
     },
-    [token, workspaceId, sendWs, sharedMode]
+    [effectiveWorkspaceId, token, workspaceId, sendWs, sharedMode]
   );
 
   const deleteSection = useCallback(
@@ -319,6 +333,7 @@ export function useSectionsEngine({ workspaceType, workspaceId, sharedMode, send
         if (!token || !workspaceId) return;
         try {
           await deleteSectionApi(token, sectionId, workspaceId);
+          await deleteSectionFromIDB(sectionId);
           setSections((prev) => prev.filter((s) => s.id !== sectionId));
         } catch {
           toast.error("Section delete failed");
@@ -356,6 +371,7 @@ export function useSectionsEngine({ workspaceType, workspaceId, sharedMode, send
           await Promise.all(
             withOrder.map((s) => updateSectionApi(token, s.id, { order: s.order, workspaceId }))
           );
+          await Promise.all(withOrder.map((section) => upsertSection(section)));
           setSections(withOrder);
         } catch {
           toast.error("Section reorder failed");
@@ -373,7 +389,12 @@ export function useSectionsEngine({ workspaceType, workspaceId, sharedMode, send
       if (token) {
         try {
           await Promise.all(
-            withOrder.map((s) => updateSectionApi(token, s.id, { order: s.order }))
+            withOrder.map((s) =>
+              updateSectionApi(token, s.id, {
+                order: s.order,
+                workspaceId: effectiveWorkspaceId ?? undefined,
+              })
+            )
           );
           for (const s of withOrder) {
             await upsertSection({ ...s, dirty: false });
@@ -388,7 +409,7 @@ export function useSectionsEngine({ workspaceType, workspaceId, sharedMode, send
         } catch {}
       }
     },
-    [token, workspaceId, sendWs, sharedMode]
+    [effectiveWorkspaceId, token, workspaceId, sendWs, sharedMode]
   );
 
   return {

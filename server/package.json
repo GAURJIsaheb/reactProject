@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon index.js",
+    "dev:cron": "nodemon cron/worker.js",
     "start": "node index.js",
+    "start:cron": "node cron/worker.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

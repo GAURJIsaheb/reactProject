@@ -1,8 +1,9 @@
 import { memo, useMemo, useState } from "react";
-import { Trash2, Check } from "lucide-react";
+import { Trash2, Check, ListTodo, Sparkles } from "lucide-react";
 import type { Task } from "@/shared/types/task";
 import { useAuthStore } from "@/zustand/authStore";
 import { apiFetchTaskImageUrl } from "@/services/task.service";
+import { getSubtaskProgressLabel, hasIncompleteSubtasks } from "@/shared/lib/subtasks";
 
 const CARD_PALETTES = [
   {
@@ -87,6 +88,8 @@ function TaskCard({
   const palette = getPalette(index);
   const isCompleted = task.completed;
   const hasImage = Boolean(task.imageUrl || task.image);
+  const subtaskProgress = getSubtaskProgressLabel(task.subtasks);
+  const hasOpenSubtasks = hasIncompleteSubtasks(task.subtasks);
   const [showImage, setShowImage] = useState(false);
   const [loadingImage, setLoadingImage] = useState(false);
   const [resolvedImageUrl, setResolvedImageUrl] = useState<string | null>(
@@ -112,7 +115,7 @@ function TaskCard({
     <div
       onClick={(e) => {
         if ((e.target as HTMLElement).closest("button,[role=menuitem]")) return;
-        if (!isCompleted) onView(task);
+        onView(task);
       }}
       className={[
         "relative flex flex-col gap-3 p-4 rounded-2xl border-2",
@@ -286,6 +289,19 @@ function TaskCard({
               #{label}
             </span>
           ))}
+        </div>
+      )}
+
+      {subtaskProgress && (
+        <div
+          className={`inline-flex items-center self-start gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold border ${
+            hasOpenSubtasks
+              ? "border-amber-300/70 bg-amber-100/70 text-amber-800"
+              : "border-emerald-300/70 bg-emerald-100/70 text-emerald-800"
+          }`}
+        >
+          {hasOpenSubtasks ? <ListTodo size={11} /> : <Sparkles size={11} />}
+          {subtaskProgress}
         </div>
       )}
 

@@ -3,10 +3,15 @@ import { Task }      from '../models/Task.model.js';
 import { Workspace } from '../models/Workspace.model.js';
 import { normalizeWorkspaceType } from '../utils/workspaceDefaults.js';
 import { TASK_PUBLIC_PROJECTION } from '../utils/taskProjection.js';
+import { bumpWorkspaceSync } from '../utils/workspaceSync.js';
 
-async function resolveArchiveWorkspace(userId, workspaceId, workspaceType) {
+//helpers
+
+
+//Purpose: figure out which workspace we are working with and ensure the user has access.
+async function helper_resolveArchiveWorkspace(userId, workspaceId, workspaceType) {
   if (workspaceId) {
-    return Workspace.findOne(
+    return Workspace.findOne(//if workspaceID is provided from the frontend side
       {
         workspaceId,
         deleted: false,
@@ -16,7 +21,7 @@ async function resolveArchiveWorkspace(userId, workspaceId, workspaceType) {
     ).lean();
   }
 
-  return Workspace.findOne(
+  return Workspace.findOne(//if workspaceID ise not provided from the frontend side
     {
       owner: userId,
       type: normalizeWorkspaceType(workspaceType),
@@ -26,7 +31,9 @@ async function resolveArchiveWorkspace(userId, workspaceId, workspaceType) {
   ).lean();
 }
 
-async function broadcastTaskUpdates(req, workspaceId, taskIds) {
+
+//Purpose: send realtime updates to all connected collaborators.
+async function helper_broadcastTaskUpdates(req, workspaceId, taskIds) {
   if (!workspaceId || !taskIds.length) return;
   const updatedTasks = await Task.find(
     { taskId: { $in: taskIds } },
@@ -43,6 +50,9 @@ async function broadcastTaskUpdates(req, workspaceId, taskIds) {
   }
 }
 
+
+
+//controllers
 export const bulkArchive = async (req, res) => {
   const { tasks } = req.body;
   const { userId } = req.user;
@@ -50,7 +60,7 @@ export const bulkArchive = async (req, res) => {
   if (!Array.isArray(tasks) || !tasks.length)//simple input validation
     return res.status(400).json({ error: 'tasks array required' });
 
-  const workspace = await resolveArchiveWorkspace(
+  const workspace = await helper_resolveArchiveWorkspace(
     userId,
     tasks[0]?.workspaceId,
     tasks[0]?.workspaceType
@@ -83,7 +93,8 @@ export const bulkArchive = async (req, res) => {
     { $set: { archived: true, updatedAt: now } }
   );
 
-  await broadcastTaskUpdates(req, workspace.workspaceId, tasks.map((t) => t.id));
+  await bumpWorkspaceSync(workspace.workspaceId);
+  await helper_broadcastTaskUpdates(req, workspace.workspaceId, tasks.map((t) => t.id));
 
   res.json({ ok: true });
 };
@@ -91,7 +102,7 @@ export const bulkArchive = async (req, res) => {
 export const getArchive = async (req, res) => {
   const { userId } = req.user;
   const { workspaceId, workspaceType } = req.query;
-  const workspace = await resolveArchiveWorkspace(userId, workspaceId, workspaceType);
+  const workspace = await helper_resolveArchiveWorkspace(userId, workspaceId, workspaceType);
   if (!workspace) return res.json({ tasks: [] });
 
   const tasks = await Archive.find({
@@ -108,7 +119,7 @@ export const restoreOne = async (req, res) => {
   const { userId } = req.user;
   const { workspaceId, workspaceType } = req.body;
 
-  const workspace = await resolveArchiveWorkspace(userId, workspaceId, workspaceType);
+  const workspace = await helper_resolveArchiveWorkspace(userId, workspaceId, workspaceType);
   if (!workspace) return res.status(404).json({ error: 'workspace not found' });
 
   const now = Date.now();
@@ -121,7 +132,8 @@ export const restoreOne = async (req, res) => {
     { $set: { archived: false, updatedAt: now } }
   );
 
-  await broadcastTaskUpdates(req, workspace.workspaceId, [id]);
+  await bumpWorkspaceSync(workspace.workspaceId);
+  await helper_broadcastTaskUpdates(req, workspace.workspaceId, [id]);
 
   res.json({ ok: true });
 };
@@ -130,7 +142,7 @@ export const restoreAll = async (req, res) => {
   const { userId } = req.user;
   const { workspaceId, workspaceType } = req.body;
 
-  const workspace = await resolveArchiveWorkspace(userId, workspaceId, workspaceType);
+  const workspace = await helper_resolveArchiveWorkspace(userId, workspaceId, workspaceType);
   if (!workspace) return res.status(404).json({ error: 'workspace not found' });
 
   const archived = await Archive.find({
@@ -152,7 +164,8 @@ export const restoreAll = async (req, res) => {
     { $set: { archived: false, updatedAt: now } }
   );
 
-  await broadcastTaskUpdates(req, workspace.workspaceId, archived.map((a) => a._id));
+  await bumpWorkspaceSync(workspace.workspaceId);
+  await helper_broadcastTaskUpdates(req, workspace.workspaceId, archived.map((a) => a._id));
 
   res.json({ ok: true });
 };

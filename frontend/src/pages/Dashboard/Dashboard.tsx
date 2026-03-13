@@ -1,9 +1,10 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useAuthStore } from "@/zustand/authStore";
 import { useTasksEngine } from "@/hooks/useTasksEngine";
 import { useSectionsEngine } from "@/hooks/useSectionsEngine";
 import { useTheme } from "@/shared/components/toggleTheme/theme";
 import { toast } from "sonner";
+import type { WorkspaceTemplate } from "@/shared/data/workspaceTemplates";
 
 import Sidebar from "./components/sidebar/Sidebar";
 import StatsBar from "./components/StatsBar";
@@ -43,6 +44,7 @@ export default function Dashboard() {
     deleteTask,
     reloadTasks,
     isSharedWorkspace,
+    refreshWorkspaceOptions,
     // ── collab additions ──
     currentWsId,
     sendWs,
@@ -103,6 +105,7 @@ export default function Dashboard() {
   // ───────── SYNC ENGINE ─────────
   useWorkspaceSync(
     workspace,
+    setWorkspace,
     token,
     userEmail,
     isSharedWorkspace,
@@ -111,7 +114,8 @@ export default function Dashboard() {
     workspaceId,
     reloadTasks,
     loadSections,
-    reloadCompletionNotifications
+    reloadCompletionNotifications,
+    refreshWorkspaceOptions
   );
 
   // ───────── TASK ACTIONS ─────────
@@ -142,6 +146,94 @@ export default function Dashboard() {
   }, [addWorkspace]);
 
   const handleDeleteWorkspace = useCallback(() => deleteWorkspace(), [deleteWorkspace]);
+
+  // ───────── TEMPLATE APPLICATION ─────────
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
+
+  const handleApplyTemplate = useCallback(async (template: WorkspaceTemplate) => {
+    if (applyingTemplate) return;
+    setApplyingTemplate(true);
+
+    try {
+      // 1) Create all sections sequentially so order is preserved
+      for (const sec of template.sections) {
+        await createSection(sec.title);
+      }
+
+      // 2) Reload sections so the engine + IDB are in sync
+      await loadSections();
+
+      // 3) Fetch fresh sections directly from the service layer.
+      //    We can't rely on `sections` React state here because the
+      //    callback closure captured the old value. Fetching from the
+      //    API gives us the real, up-to-date list with IDs.
+      const { default: svcFetch } = await import("@/services/section.service").then(
+        (m) => ({ default: m.fetchSections })
+      );
+      const { apiBulkCreateTasks } = await import("@/services/task.service");
+      const { fetchWorkspaceId, pullFromServer } = await import("@/infrastructure/mongoSync/sync");
+      const freshSections = await svcFetch(
+        token!,
+        workspace,
+        currentWsId ?? undefined,
+      );
+
+      // 4) Create tasks in each section, matched by title
+      const bulkTasks: Array<{
+        id: string;
+        text: string;
+        workspaceType: string;
+        workspaceId?: string | null;
+        sectionId: string;
+        labels: string[];
+        subtasks: { text: string }[];
+      }> = [];
+
+      for (const tplSection of template.sections) {
+        const matched = freshSections.find((s) => s.title === tplSection.title);
+        if (!matched) continue;
+
+        for (const task of tplSection.tasks) {
+          bulkTasks.push({
+            id: crypto.randomUUID(),
+            text: task.text,
+            workspaceType: workspace,
+            workspaceId: currentWsId ?? undefined,
+            sectionId: matched.id,
+            labels: task.labels ?? [],
+            subtasks: task.subtasks ?? [],
+          });
+        }
+      }
+
+      if (bulkTasks.length > 0) {
+        await apiBulkCreateTasks(bulkTasks, token!);
+        const resolvedWorkspaceId =
+          currentWsId ??
+          workspaceId ??
+          await fetchWorkspaceId(workspace, token!);
+
+        if (resolvedWorkspaceId) {
+          await pullFromServer(
+            resolvedWorkspaceId,
+            workspace,
+            token!,
+            userEmail ?? "",
+            isSharedWorkspace
+          );
+        }
+      }
+
+      await loadSections();
+      await reloadTasks();
+      toast.success(`"${template.name}" template applied!`);
+    } catch (err) {
+      console.error("Template apply error:", err);
+      toast.error("Couldn't fully apply this template");
+    } finally {
+      setApplyingTemplate(false);
+    }
+  }, [applyingTemplate, createSection, loadSections, reloadTasks, token, workspace, currentWsId, workspaceId, userEmail, isSharedWorkspace]);
 
   // ───────── RENDER ─────────
   return (
@@ -220,7 +312,10 @@ export default function Dashboard() {
           {loading ? (
             <KanbanSkeleton count={3} />
           ) : hasNoSections ? (
-            <EmptyBoardState onCreateFirst={() => createSection("My Tasks")} />
+            <EmptyBoardState
+              onCreateFirst={() => createSection("My Tasks")}
+              onApplyTemplate={handleApplyTemplate}
+            />
           ) : (
             <KanbanBoard
               sections={sections}
@@ -247,12 +342,12 @@ export default function Dashboard() {
         onOpenChange={() => setViewTask(null)}
         task={viewTask}
         reminderDueAt={viewTask ? getReminderDueAt(viewTask.id) : null}
-        onSave={async (id, text, labels, image, removeImage, reminderAt = null) => {
+        onSave={async (id, text, labels, subtasks, image, removeImage, reminderAt = null) => {
           if (reminderAt !== null && reminderAt <= Date.now()) {
             toast.error("Reminder time should be in future");
             return false;
           }
-          const ok = await actions.handleEditSave(id, text, labels, image, removeImage, reminderAt);
+          const ok = await actions.handleEditSave(id, text, labels, subtasks, image, removeImage, reminderAt);
           if (!ok) return false;
           setViewTask(null);
           toast.success("Task updated");

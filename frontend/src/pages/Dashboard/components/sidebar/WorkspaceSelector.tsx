@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { LoaderCircle, Plus, Trash2, X, UserPlus } from "lucide-react";
+import { LoaderCircle, Plus, Trash2, X, UserRoundCog } from "lucide-react";
 import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
 import type { WorkspaceOption } from "@/hooks/useTasksEngine";
 import {
@@ -127,8 +127,8 @@ export default function WorkspaceSelector({
             className="sidebar-ws-action-btn sidebar-ws-action-btn--invite"
             title="Invite collaborator"
           >
-            <UserPlus size={14} />
-            <span>Invite</span>
+            <UserRoundCog size={14} />
+            <span>Invites</span>
           </button>
         )}
 

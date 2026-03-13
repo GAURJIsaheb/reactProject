@@ -3,10 +3,10 @@ import { verifyToken } from '../auth/jwt.js';
 
 export class CollabWsServer {
   constructor(httpServer) {
-    this.wss   = new WebSocketServer({ server: httpServer, path: '/ws' });
+    this.wss   = new WebSocketServer({ server: httpServer, path: '/ws' });//WebSocket server creation
     this.rooms = new Map(); // workspaceId → Set<WebSocket>
 
-    this.wss.on('connection', (ws, req) => this._onConnect(ws, req));
+    this.wss.on('connection', (ws, req) => this._onConnect(ws, req));//new connection
   }
 
   // ── Connection ──────────────────────────────────────────────────────────────
@@ -16,7 +16,7 @@ export class CollabWsServer {
 
     try {
       const payload = verifyToken(token);
-      ws.userId = String(payload.id ?? payload._id ?? payload.sub);
+      ws.userId = String(payload.id ?? payload._id ?? payload.sub);//store identity on socket
     } catch {
       ws.close(4001, 'Unauthorized');
       return;
@@ -26,11 +26,11 @@ export class CollabWsServer {
     ws.isAlive      = true;
 
     ws.on('pong',    ()    => { ws.isAlive = true; });
-    ws.on('message', (raw) => this._onMessage(ws, raw));
-    ws.on('close',   ()    => this._onClose(ws));
+    ws.on('message', (raw) => this._onMessage(ws, raw));//func
+    ws.on('close',   ()    => this._onClose(ws));//func
   }
 
-  // ── Message routing ─────────────────────────────────────────────────────────
+  // ── Message routing 
   _onMessage(ws, raw) {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
@@ -40,11 +40,11 @@ export class CollabWsServer {
 
     switch (type) {
       case 'JOIN_WORKSPACE':
-        this._joinRoom(ws, workspaceId);
+        this._joinRoom(ws, workspaceId);//func
         break;
 
       case 'LEAVE_WORKSPACE':
-        this._leaveRoom(ws, workspaceId);
+        this._leaveRoom(ws, workspaceId);//func
         break;
 
       // Relay task / section mutations to all OTHER members of the workspace
@@ -54,7 +54,7 @@ export class CollabWsServer {
       case 'SECTION_CREATE':
       case 'SECTION_UPDATE':
       case 'SECTION_DELETE':
-        this._relay(ws, workspaceId, msg);
+        this._relay(ws, workspaceId, msg);//func
         break;
 
       default:
@@ -66,7 +66,7 @@ export class CollabWsServer {
   _joinRoom(ws, workspaceId) {
     if (!workspaceId) return;
 
-    if (!this.rooms.has(workspaceId)) this.rooms.set(workspaceId, new Set());
+    if (!this.rooms.has(workspaceId)) this.rooms.set(workspaceId, new Set());//new workspace
 
     this.rooms.get(workspaceId).add(ws);
     ws.workspaceIds.add(workspaceId);
@@ -94,7 +94,8 @@ export class CollabWsServer {
     if (!room) return;
     const payload = JSON.stringify(msg);
     room.forEach((ws) => {
-      if (ws !== senderWs && ws.readyState === WebSocket.OPEN) {
+      if (ws !== senderWs //except sender
+        && ws.readyState === WebSocket.OPEN) {
         ws.send(payload);
       }
     });

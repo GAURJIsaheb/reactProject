@@ -260,6 +260,7 @@ export default function Sidebar({
         <InviteModal
           workspaceId={currentWsId}
           workspaceName={currentWsLabel}
+          isOwner={Boolean(currentOption?.isOwner)}
           onClose={() => setShowInvite(false)}
         />
       )}

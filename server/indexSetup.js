@@ -16,9 +16,9 @@ export function createServer() {
 
 
   app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:4000' ,'http://192.168.31.14:5173'],
-    credentials: true 
-  }));
+      origin: ['http://localhost:5173', 'http://localhost:4000' ,'http://192.168.31.14:5173'],
+      credentials: true 
+    }));
 
 
 

@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const workspaceInviteSchema = new mongoose.Schema(
   {
-    token:        { type: String, required: true, unique: true },//unique:true also create an indexing
+    token:        { type: String, required: true, unique: true },
     workspaceId:  { type: String, required: true },
     invitedBy:    { type: mongoose.Schema.Types.ObjectId, ref: 'users', required: true },
     invitedEmail: { type: String, required: true, lowercase: true, trim: true },

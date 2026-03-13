@@ -1,11 +1,25 @@
 import mongoose from 'mongoose';
 
+const subtaskSchema = new mongoose.Schema({
+  id:        { type: String, required: true, trim: true },
+  text:      { type: String, required: true, trim: true },
+  completed: { type: Boolean, default: false },
+}, { _id: false, versionKey: false });
+
 const taskSchema = new mongoose.Schema({
   taskId:        { type: String,  required: true, unique: true },
   workspaceId:   { type: String,  required: true, ref: 'workspaces' },
   sectionId:     { type: String,  default: null,  ref: 'sections' },
   text:          { type: String,  required: true, trim: true },
   labels:        { type: [String], default: [] },
+  subtasks:      {
+    type: [subtaskSchema],
+    default: [],
+    validate: {
+      validator: (value) => Array.isArray(value) && value.length <= 3,
+      message: 'subtasks cannot exceed 3',
+    },
+  },
   image:         { type: String,  default: null }, // S3 key
   imageUrl:      { type: String,  default: null }, // cached signed URL
   imageUrlExpiry:{ type: Number,  default: null }, // ms timestamp
@@ -21,11 +35,21 @@ const taskSchema = new mongoose.Schema({
   updatedAt:     { type: Number,  default: () => Date.now() },
 }, { versionKey: false });
 
-taskSchema.index({ sectionId: 1, deleted: 1 });
+
 taskSchema.index({ sectionId: 1, createdBy: 1, deleted: 1 });
-taskSchema.index({ deleted: 1, createdBy: 1 });
 taskSchema.index({ deleted: 1, updatedAt: -1 });
-taskSchema.index({ deleted: 1, deletedAt: 1 });
 taskSchema.index({ workspaceId: 1, updatedAt: 1 });
-taskSchema.index({ workspaceId: 1, deleted: 1, updatedAt: -1 });
+taskSchema.index({ workspaceId: 1, deleted: 1 }); //for workspace deletion
 export const Task = mongoose.model('tasks', taskSchema);
+
+
+/*
+
+  taskSchema.index({ sectionId: 1, deleted: 1 });
+  
+  taskSchema.index({ deleted: 1, deletedAt: 1 });
+
+  taskSchema.index({ deleted: 1, createdBy: 1 });
+
+
+ */

@@ -2,11 +2,12 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { initDB, clearWorkspaceDataFromIDB } from "@/infrastructure/lib/idb";
 import { useAuthStore } from "@/zustand/authStore";
-import type { Task } from "@/shared/types/task";
+import type { Task, TaskSubtask } from "@/shared/types/task";
 import { processQueue } from "@/infrastructure/queue/syncQueue";
 
 import {
   loadLocalTasks,
+  loadWorkspaceTasks,
   getLocalTask,
   saveLocalTask,
   deleteLocalTask,
@@ -23,10 +24,9 @@ import {
   apiCreateTask,
   apiUpdateTask,
   apiDeleteTask,
-  fetchTasksFromServer,
 } from "../services/task.service";
 
-import { pullFromServer } from "@/infrastructure/mongoSync/sync";
+import { fetchWorkspaceId, pullFromServer } from "@/infrastructure/mongoSync/sync";
 
 import {
   addTask as idbAddTask,
@@ -41,6 +41,11 @@ import {
   deleteWorkspace as deleteWorkspaceApi,
   listMyWorkspaces,
 } from "@/services/workspace.service";
+import { hasIncompleteSubtasks, normalizeSubtasks } from "@/shared/lib/subtasks";
+import {
+  readCachedWorkspaceOptions,
+  writeCachedWorkspaceOptions,
+} from "@/infrastructure/cache/workspaceCache";
 
 export type WorkspaceOption = {
   value: string;
@@ -55,10 +60,6 @@ export type SectionWsHandler = (type: string, payload: unknown) => Promise<void>
 
 function workspaceKey(email: string) {
   return `workspace:${email}`;
-}
-
-function workspaceOptionsKey(email: string) {
-  return `workspace-options:${email}`;
 }
 
 const DEFAULT_WORKSPACES: WorkspaceOption[] = [
@@ -78,10 +79,13 @@ function toWorkspaceValue(name: string) {
   );
 }
 
+function getServerWorkspaceLabel(workspace: { name?: string; type: string }) {
+  return workspace.name?.trim() || workspace.type;
+}
+
 function getInitialWorkspaceOptions(email: string): WorkspaceOption[] {
   try {
-    const raw = localStorage.getItem(workspaceOptionsKey(email));
-    const parsed = raw ? (JSON.parse(raw) as WorkspaceOption[]) : [];
+    const parsed = readCachedWorkspaceOptions(email) ?? [];
     if (!Array.isArray(parsed)) return DEFAULT_WORKSPACES;
 
     const merged = new Map<string, WorkspaceOption>();
@@ -117,6 +121,7 @@ function requireOnline(action: string): boolean {
 
 export function useTasksEngine() {
   const { userEmail, token } = useAuthStore();
+  const userId = useAuthStore((state) => state.userId);
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isDeletingWorkspace, setIsDeletingWorkspace] = useState(false);
@@ -138,6 +143,94 @@ export function useTasksEngine() {
   const currentWsId = activeWorkspaceOption?.id ?? null;
   const isSharedWorkspace = (activeWorkspaceOption?.memberCount ?? 1) > 1;
   const isCollabWorkspace = isSharedWorkspace;
+
+  const refreshWorkspaceOptions = useCallback(async () => {
+    if (!userEmail || !token || !navigator.onLine) return;
+
+    try {
+      const { workspaces } = await listMyWorkspaces(token);
+      const serverIds = new Set(workspaces.map((workspace) => workspace.workspaceId));
+
+      setWorkspaceOptions((prev) => {
+        const byValue = new Map<string, WorkspaceOption>();
+
+        for (const opt of DEFAULT_WORKSPACES) {
+          byValue.set(opt.value, { ...opt });
+        }
+
+        for (const opt of prev) {
+          if (isBuiltInWorkspace(opt.value)) {
+            const builtIn = byValue.get(opt.value)!;
+            byValue.set(opt.value, {
+              ...builtIn,
+              label: opt.label || builtIn.label,
+            });
+            continue;
+          }
+
+          if (opt.id && !serverIds.has(opt.id)) continue;
+          byValue.set(opt.value, { ...opt });
+        }
+
+        for (const serverWorkspace of workspaces) {
+          const workspaceLabel = getServerWorkspaceLabel(serverWorkspace);
+          const slug = toWorkspaceValue(workspaceLabel);
+          const existing = byValue.get(slug);
+
+          if (existing) {
+            byValue.set(slug, {
+              ...existing,
+              label: workspaceLabel,
+              emoji: serverWorkspace.emoji || existing.emoji,
+              id: serverWorkspace.workspaceId,
+              memberCount: serverWorkspace.memberCount ?? existing.memberCount ?? 1,
+              isOwner: serverWorkspace.isOwner,
+            });
+            continue;
+          }
+
+          const taken = new Set(byValue.keys());
+          let finalValue = slug;
+          let suffix = 2;
+          while (taken.has(finalValue)) {
+            finalValue = `${slug}-${suffix}`;
+            suffix += 1;
+          }
+
+          byValue.set(finalValue, {
+            value: finalValue,
+            label: workspaceLabel,
+            emoji: serverWorkspace.emoji || "ðŸ“",
+            id: serverWorkspace.workspaceId,
+            memberCount: serverWorkspace.memberCount ?? 1,
+            isOwner: serverWorkspace.isOwner,
+          });
+        }
+
+        return [...byValue.values()];
+      });
+    } catch {}
+  }, [token, userEmail]);
+
+  useEffect(() => {
+    void refreshWorkspaceOptions();
+  }, [refreshWorkspaceOptions]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const syncWorkspaceOptions = () => {
+      void refreshWorkspaceOptions();
+    };
+
+    window.addEventListener("focus", syncWorkspaceOptions);
+    window.addEventListener("online", syncWorkspaceOptions);
+
+    return () => {
+      window.removeEventListener("focus", syncWorkspaceOptions);
+      window.removeEventListener("online", syncWorkspaceOptions);
+    };
+  }, [refreshWorkspaceOptions, token]);
 
   useEffect(() => {
     if (!userEmail || !token || !navigator.onLine) return;
@@ -168,13 +261,14 @@ export function useTasksEngine() {
           }
 
           for (const serverWorkspace of workspaces) {
-            const slug = toWorkspaceValue(serverWorkspace.type);
+            const workspaceLabel = getServerWorkspaceLabel(serverWorkspace);
+            const slug = toWorkspaceValue(workspaceLabel);
             const existing = byValue.get(slug);
 
             if (existing) {
               byValue.set(slug, {
                 ...existing,
-                label: serverWorkspace.type,
+                label: workspaceLabel,
                 emoji: serverWorkspace.emoji || existing.emoji,
                 id: serverWorkspace.workspaceId,
                 memberCount: serverWorkspace.memberCount ?? existing.memberCount ?? 1,
@@ -193,7 +287,7 @@ export function useTasksEngine() {
 
             byValue.set(finalValue, {
               value: finalValue,
-              label: serverWorkspace.type,
+              label: workspaceLabel,
               emoji: serverWorkspace.emoji || "📁",
               id: serverWorkspace.workspaceId,
               memberCount: serverWorkspace.memberCount ?? 1,
@@ -216,8 +310,11 @@ export function useTasksEngine() {
     if (match) {
       setWorkspace(match.value);
       window.history.replaceState({}, "", window.location.pathname);
+      return;
     }
-  }, [workspaceOptions]);
+
+    void refreshWorkspaceOptions();
+  }, [refreshWorkspaceOptions, workspaceOptions]);
 
   const addWorkspace = useCallback(
     async (name: string, emoji = "📁") => {
@@ -300,7 +397,7 @@ export function useTasksEngine() {
 
   useEffect(() => {
     if (!userEmail) return;
-    localStorage.setItem(workspaceOptionsKey(userEmail), JSON.stringify(workspaceOptions));
+    writeCachedWorkspaceOptions(userEmail, workspaceOptions);
   }, [workspaceOptions, userEmail]);
 
   useEffect(() => {
@@ -312,24 +409,13 @@ export function useTasksEngine() {
   const reloadTasks = useCallback(async () => {
     if (!userEmail) return;
 
-    if (isCollabWorkspace) {
-      if (!token || !currentWsId) {
-        setTasks([]);
-        return;
-      }
-
-      try {
-        const fresh = await fetchTasksFromServer(token, workspace, currentWsId);
-        setTasks(fresh.map((task) => ({ ...task, userEmail: task.userEmail || userEmail })));
-      } catch {}
-      return;
-    }
-
-    const fresh = currentWsId
-      ? await idbGetAllTasks(userEmail, workspace, currentWsId)
-      : await loadLocalTasks(userEmail, workspace);
+    const fresh = isCollabWorkspace
+      ? await loadWorkspaceTasks(userEmail, workspace, currentWsId)
+      : currentWsId
+        ? await idbGetAllTasks(userEmail, workspace, currentWsId)
+        : await loadLocalTasks(userEmail, workspace);
     setTasks(fresh);
-  }, [currentWsId, isCollabWorkspace, token, userEmail, workspace]);
+  }, [currentWsId, isCollabWorkspace, userEmail, workspace]);
 
   useEffect(() => {
     if (!userEmail) return;
@@ -342,7 +428,11 @@ export function useTasksEngine() {
 
       await initDB();
       if (token) {
-        await pullFromServer(currentWsId ?? workspace, workspace, token, userEmail, Boolean(currentWsId));
+        const resolvedWorkspaceId = currentWsId
+          ?? (isBuiltInWorkspace(workspace) ? await fetchWorkspaceId(workspace, token) : null);
+        if (resolvedWorkspaceId) {
+          await pullFromServer(resolvedWorkspaceId, workspace, token, userEmail, Boolean(currentWsId));
+        }
       }
       await reloadTasks();
     })();
@@ -377,7 +467,10 @@ export function useTasksEngine() {
       switch (msg.type) {
         case "TASK_CREATE":
         case "TASK_UPDATE": {
-          const incoming = msg.task as Task;
+          const incoming = {
+            ...(msg.task as Task),
+            subtasks: normalizeSubtasks((msg.task as Task)?.subtasks),
+          };
           if (currentWsId) {
             if (incoming.workspaceId !== currentWsId) break;
           } else if (incoming.workspaceType !== workspace) {
@@ -388,21 +481,21 @@ export function useTasksEngine() {
             ? tasks.find((task) => task.id === incoming.id) ?? null
             : await getTaskById(incoming.id).catch(() => null);
 
-          if (!local || incoming.updatedAt > local.updatedAt) {
-            const toSave = {
-              ...incoming,
-              syncStatus: "synced" as const,
-              dirty: false,
-              ...(currentWsId ? { workspaceId: currentWsId } : {}),
-            };
-            if (!isCollabWorkspace) await idbAddTask(toSave);
-            setTasks((prev) => [...prev.filter((task) => task.id !== incoming.id), toSave]);
-          }
-          break;
+        if (!local || incoming.updatedAt > local.updatedAt) {
+          const toSave = {
+            ...incoming,
+            syncStatus: "synced" as const,
+            dirty: false,
+            ...(currentWsId ? { workspaceId: currentWsId } : {}),
+          };
+          await idbAddTask(toSave);
+          setTasks((prev) => [...prev.filter((task) => task.id !== incoming.id), toSave]);
         }
+        break;
+      }
 
         case "TASK_DELETE":
-          if (!isCollabWorkspace) await deleteTaskFromIDB(msg.taskId);
+          await deleteTaskFromIDB(msg.taskId);
           setTasks((prev) => prev.filter((task) => task.id !== msg.taskId));
           break;
 
@@ -416,11 +509,19 @@ export function useTasksEngine() {
           break;
 
         case "MEMBER_JOINED":
+          void refreshWorkspaceOptions();
+          window.dispatchEvent(new CustomEvent("workspace-members-changed", {
+            detail: { workspaceId: msg.workspaceId },
+          }));
           toast.info(`${msg.name || msg.email} joined the workspace`);
           break;
 
         case "MEMBER_REMOVED":
-          if (msg.userId === userEmail) {
+          void refreshWorkspaceOptions();
+          window.dispatchEvent(new CustomEvent("workspace-members-changed", {
+            detail: { workspaceId: msg.workspaceId },
+          }));
+          if (msg.userId === userId) {
             if (currentWsId) await clearWorkspaceDataFromIDB(userEmail ?? "", workspace, currentWsId);
             setWorkspaceOptions((prev) =>
               prev.filter((option) => option.id !== msg.workspaceId)
@@ -431,6 +532,10 @@ export function useTasksEngine() {
           break;
 
         case "WORKSPACE_DELETED":
+          void refreshWorkspaceOptions();
+          window.dispatchEvent(new CustomEvent("workspace-members-changed", {
+            detail: { workspaceId: msg.workspaceId },
+          }));
           if (userEmail && msg.workspaceId) {
             const removed = workspaceOptions.find((option) => option.id === msg.workspaceId);
             if (removed) {
@@ -438,7 +543,7 @@ export function useTasksEngine() {
             }
           }
           setWorkspaceOptions((prev) => prev.filter((option) => option.id !== msg.workspaceId));
-          if (currentWsId === msg.workspaceId) {
+          if (currentWsId === msg.workspaceId || activeWorkspaceOption?.id === msg.workspaceId) {
             setTasks([]);
             setWorkspace("personal");
             toast.warning("Workspace was deleted");
@@ -471,11 +576,22 @@ export function useTasksEngine() {
     imageFile?: File | null,
     sectionId?: string | null,
     reminderAt?: number | null,
-    labels: string[] = []
+    labels: string[] = [],
+    subtasks: Pick<TaskSubtask, "text">[] = []
   ) {
     if (!userEmail) throw new Error("User not authenticated");
     const trimmedText = text.trim();
     if (!trimmedText) return null;
+
+    const normalizedSubtasks = subtasks
+      .map((subtask) => subtask.text.trim())
+      .filter(Boolean)
+      .slice(0, 3)
+      .map((subtaskText) => ({
+        id: crypto.randomUUID(),
+        text: subtaskText,
+        completed: false,
+      }));
 
     const createKey = [
       isCollabWorkspace ? currentWsId ?? "shared" : workspace,
@@ -495,6 +611,7 @@ export function useTasksEngine() {
         id: crypto.randomUUID(),
         text: trimmedText,
         labels,
+        subtasks: normalizedSubtasks,
         completed: false,
         archived: false,
         deleted: false,
@@ -520,6 +637,7 @@ export function useTasksEngine() {
           ...task,
           text: result?.task?.text ?? text,
           labels: result?.task?.labels ?? labels,
+          subtasks: normalizeSubtasks(result?.task?.subtasks ?? task.subtasks),
           image: result?.task?.imageUrl ?? result?.task?.image ?? null,
           imageUrl: result?.task?.imageUrl ?? null,
           imageUrlExpiry: result?.task?.imageUrlExpiry ?? null,
@@ -529,6 +647,7 @@ export function useTasksEngine() {
           workspaceId: result?.task?.workspaceId ?? currentWsId,
           version: result?.task?.version ?? 1,
         };
+        await idbAddTask(createdTask);
         setTasks((prev) => [...prev.filter((item) => item.id !== createdTask.id), createdTask]);
         return createdTask;
       } catch {
@@ -544,6 +663,7 @@ export function useTasksEngine() {
       id: crypto.randomUUID(),
       text: trimmedText,
       labels,
+      subtasks: normalizedSubtasks,
       completed: false,
       archived: false,
       deleted: false,
@@ -577,6 +697,7 @@ export function useTasksEngine() {
         ...task,
         syncStatus: "synced",
         dirty: false,
+        subtasks: normalizeSubtasks(result?.task?.subtasks ?? task.subtasks),
         image: result?.task?.imageUrl ?? result?.task?.image ?? null,
         imageUrl: result?.task?.imageUrl ?? null,
         imageUrlExpiry: result?.task?.imageUrlExpiry ?? null,
@@ -603,6 +724,13 @@ export function useTasksEngine() {
       if (!token || !requireOnline("Update Task")) return;
       const task = tasks.find((item) => item.id === id);
       if (!task) return;
+      if (!task.completed && hasIncompleteSubtasks(task.subtasks)) {
+        toast.error("Subtasks first,", {
+          description: "Finish all subtasks before marking the main task complete.",
+          duration: 3200,
+        });
+        return;
+      }
 
       try {
         const result = await apiUpdateTask(
@@ -614,6 +742,7 @@ export function useTasksEngine() {
           ...task,
           ...result?.task,
           id,
+          subtasks: normalizeSubtasks(result?.task?.subtasks ?? task.subtasks),
           image: result?.task?.imageUrl ?? result?.task?.image ?? task.image,
           imageUrl: result?.task?.imageUrl ?? task.imageUrl ?? null,
           imageUrlExpiry: result?.task?.imageUrlExpiry ?? task.imageUrlExpiry ?? null,
@@ -621,6 +750,7 @@ export function useTasksEngine() {
           syncStatus: "synced",
           dirty: false,
         };
+        await idbAddTask(updatedTask);
         setTasks((prev) => prev.map((item) => (item.id === id ? updatedTask : item)));
         broadcastTask("TASK_UPDATE", updatedTask);
       } catch {
@@ -631,6 +761,13 @@ export function useTasksEngine() {
 
     const task = await getLocalTask(id);
     if (!task) return;
+    if (!task.completed && hasIncompleteSubtasks(task.subtasks)) {
+      toast.error("Subtasks first,", {
+        description: "Finish all subtasks before marking the main task complete.",
+        duration: 3200,
+      });
+      return;
+    }
 
     const updated: Task = {
       ...task,
@@ -664,6 +801,7 @@ export function useTasksEngine() {
       if (!token || !requireOnline("Delete Task")) return;
       try {
         await apiDeleteTask(id, token);
+        await deleteTaskFromIDB(id);
         setTasks((prev) => prev.filter((task) => task.id !== id));
         broadcastTaskDelete(id);
       } catch {
@@ -702,6 +840,7 @@ export function useTasksEngine() {
           ...task,
           ...result?.task,
           id,
+          subtasks: normalizeSubtasks(result?.task?.subtasks ?? task.subtasks),
           image: result?.task?.imageUrl ?? result?.task?.image ?? newImage ?? task.image,
           imageUrl: result?.task?.imageUrl ?? task.imageUrl ?? null,
           imageUrlExpiry: result?.task?.imageUrlExpiry ?? task.imageUrlExpiry ?? null,
@@ -709,6 +848,7 @@ export function useTasksEngine() {
           syncStatus: "synced",
           dirty: false,
         };
+        await idbAddTask(updatedTask);
         setTasks((prev) => prev.map((item) => (item.id === id ? updatedTask : item)));
         broadcastTask("TASK_UPDATE", updatedTask);
       } catch {
@@ -768,6 +908,7 @@ export function useTasksEngine() {
           ...task,
           ...result?.task,
           id,
+          subtasks: normalizeSubtasks(result?.task?.subtasks ?? task.subtasks),
           image: result?.task?.imageUrl ?? result?.task?.image ?? task.image,
           imageUrl: result?.task?.imageUrl ?? task.imageUrl ?? null,
           imageUrlExpiry: result?.task?.imageUrlExpiry ?? task.imageUrlExpiry ?? null,
@@ -775,6 +916,7 @@ export function useTasksEngine() {
           syncStatus: "synced",
           dirty: false,
         };
+        await idbAddTask(updatedTask);
         setTasks((prev) => prev.map((item) => (item.id === id ? updatedTask : item)));
         broadcastTask("TASK_UPDATE", updatedTask);
       } catch {
@@ -827,6 +969,7 @@ export function useTasksEngine() {
     reloadTasks,
     currentWsId,
     isSharedWorkspace,
+    refreshWorkspaceOptions,
     sendWs,
     registerSectionWsHandler,
   };

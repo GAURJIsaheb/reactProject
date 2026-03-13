@@ -88,6 +88,7 @@ export const addTask = async (task: Partial<Task>): Promise<void> => {
     workspaceType: task.workspaceType ?? existing?.workspaceType ?? "personal",
     image: task.image !== undefined ? task.image : existing?.image,
     labels: Array.isArray(task.labels) ? task.labels : (existing?.labels ?? []),
+    subtasks: Array.isArray(task.subtasks) ? task.subtasks : (existing?.subtasks ?? []),
   });
 };
 
@@ -129,21 +130,28 @@ export async function getAllTasksForUser(userEmail: string): Promise<Task[]> {
 }
 
 export async function pruneSyncedTasksMissingOnServer(
-  userEmail: string, workspaceType: string, serverTaskIds: string[]
-): Promise<void> {
-  if (!userEmail) return;
+  userEmail: string,
+  workspaceType: string,
+  serverTaskIds: string[],
+  workspaceId?: string | null
+): Promise<number> {
+  if (!userEmail) return 0;
   const db    = await initDB();
   const all   = await db.getAll(STORE_TASKS);
   const ids   = new Set(serverTaskIds);
   const stale = all.filter(
-    (t) => t.userEmail === userEmail &&
-           (t.workspaceType || "personal") === workspaceType &&
-           t.syncStatus === "synced" && !ids.has(t.id)
+    (t) =>
+      (workspaceId
+        ? t.workspaceId === workspaceId
+        : t.userEmail === userEmail && (t.workspaceType || "personal") === workspaceType) &&
+      t.syncStatus === "synced" &&
+      !ids.has(t.id)
   );
-  if (!stale.length) return;
+  if (!stale.length) return 0;
   const tx = db.transaction(STORE_TASKS, "readwrite");
   for (const t of stale) tx.store.delete(t.id);
   await tx.done;
+  return stale.length;
 }
 
 export async function getTaskById(id: string): Promise<Task | null> {
@@ -350,7 +358,7 @@ export async function pruneSyncedSectionsMissingOnServer(
   workspaceType:    string,
   serverSectionIds: string[],
   workspaceId?:     string | null
-): Promise<void> {
+): Promise<number> {
   const db    = await initDB();
   const tx    = db.transaction("sections", "readwrite");
   const store = tx.objectStore("sections");
@@ -360,10 +368,15 @@ export async function pruneSyncedSectionsMissingOnServer(
     ? await store.index(IDX_SECTIONS_BY_WORKSPACE_ID).getAll(IDBKeyRange.only(workspaceId))
     : await store.index(IDX_SECTIONS_BY_USER_WORKSPACE).getAll([userEmail, workspaceType]);
 
+  let pruned = 0;
   for (const s of local)
-    if (!idSet.has(s.id) && !s.dirty) await store.delete(s.id);
+    if (!idSet.has(s.id) && !s.dirty) {
+      await store.delete(s.id);
+      pruned += 1;
+    }
 
   await tx.done;
+  return pruned;
 }
 
 // ── Notifications ─────────────────────────────────────────────────────────────

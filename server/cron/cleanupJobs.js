@@ -7,14 +7,14 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-export function log(label, data = {}) {
+function log(label, data = {}) {
   const ts = new Date().toISOString();
   console.log(`[CRON][${ts}] ${label}`, Object.keys(data).length ? data : '');
 }
 
 // ─── Job 1: Hard-delete soft-deleted tasks older than 30 days ─────────────────
-// Schedule: every day at 02:00 IST
-export function scheduleTaskCleanup() {
+// every day at 02:00 IST
+function scheduleTaskCleanup() {
   cron.schedule('0 2 * * *', async () => {
     log('task-cleanup: starting');
     try {
@@ -28,9 +28,9 @@ export function scheduleTaskCleanup() {
   log('task-cleanup: scheduled — daily 02:00 IST');
 }
 
-// ─── Job 2: Hard-delete archive entries older than 60 days ───────────────────
-// Schedule: every Sunday at 03:00 IST
-export function scheduleArchiveCleanup() {
+// ─── Job 2: Hard-delete for archive ---- > older than 60 days ───────────────────
+// every Sunday at 03:00 IST
+function scheduleArchiveCleanup() {
   cron.schedule('0 3 * * 0', async () => {
     log('archive-cleanup: starting');
     try {
@@ -45,8 +45,8 @@ export function scheduleArchiveCleanup() {
 }
 
 // ─── Job 3: Flag tasks approaching the 30-day hard-delete window ─────────────
-// Schedule: every day at 08:00 IST
-export function scheduleExpiryWarnings() {
+// every day--- > 08:00 IST
+function scheduleExpiryWarnings() {
   cron.schedule('0 8 * * *', async () => {
     log('expiry-warning: starting');
     try {
@@ -70,9 +70,38 @@ export function scheduleExpiryWarnings() {
 }
 
 // ─── Register all jobs (call once after DB connects) ─────────────────────────
-export function registerCronJobs() {
+export function registerCronJobs() {//initialisation in server/index.js
   scheduleTaskCleanup();
   scheduleArchiveCleanup();
   scheduleExpiryWarnings();
   log('All cron jobs registered ✓');
 }
+
+
+
+
+
+
+
+/*
+eg tasks to show deletion of cron jobs:
+
+db.tasks.insertOne({
+  taskId: "test-old-task",
+  workspaceId: "ws1",
+  text: "old deleted task",
+  deleted: true,
+  deletedAt: Date.now() - (35 * 24 * 60 * 60 * 1000),
+  createdBy: ObjectId("64a000000000000000000001"),
+  workspaceType: "personal",
+  labels: [],
+  subtasks: [],
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+  version: 1
+})
+
+
+
+
+*/

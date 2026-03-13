@@ -5,6 +5,7 @@ export const TASK_PUBLIC_PROJECTION = {
   sectionId: 1,
   text: 1,
   labels: 1,
+  subtasks: 1,
   image: 1,
   imageUrl: 1,
   imageUrlExpiry: 1,

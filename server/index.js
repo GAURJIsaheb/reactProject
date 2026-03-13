@@ -1,7 +1,6 @@
 import { createServer }    from './indexSetup.js';
 import { registerRoutes }   from './routes/index.js';
 import { connectDB }        from './mongo/mongo.js';
-import { registerCronJobs } from './cron/cleanupJobs.js';
 import { startConsumer }    from './sqs/sqsConsumer.js';
 import { CollabWsServer }   from './websocket/wsServer.js';      
 import path from 'path';
@@ -21,8 +20,7 @@ app.use((err, req, res, next) => {
 
 async function start() {
   await connectDB();
-  registerCronJobs();
-  startConsumer();
+  startConsumer();///sqs
 
   // Use http.createServer so WS and HTTP share the same port
   const { createServer: createHttpServer } = await import('http');
@@ -31,7 +29,7 @@ async function start() {
   // Attach WebSocket server
   const wsServer = new CollabWsServer(httpServer);
   wsServer.startHeartbeat();
-  app.set('wsServer', wsServer);                               
+  app.set('wsServer', wsServer); //so any route can access wsServer                           
 
   httpServer.listen(4000, () =>
     console.log('Server on 4000 + Mongo + WebSocket')

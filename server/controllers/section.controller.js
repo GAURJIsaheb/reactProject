@@ -1,5 +1,6 @@
 import { Section } from "../models/Section.model.js";
 import { Task }    from "../models/Task.model.js";
+import { bumpWorkspaceSync } from "../utils/workspaceSync.js";
 
 // Build a Mongoose filter depending on whether this is a collab workspace.
 // Collab → filter by workspaceId (any member can touch it).
@@ -50,6 +51,7 @@ export async function createSection(req, res) {
 
   // Broadcast to collab peers so they see the new section in real-time
   if (workspaceId) {
+    await bumpWorkspaceSync(workspaceId);
     req.app.get("wsServer")?.broadcastToWorkspace(workspaceId, {
       type:       "SECTION_CREATE",
       workspaceId,
@@ -79,6 +81,7 @@ export async function updateSection(req, res) {
     .lean();
 
   if (workspaceId && updated) {
+    await bumpWorkspaceSync(workspaceId);
     req.app.get("wsServer")?.broadcastToWorkspace(workspaceId, {
       type:       "SECTION_UPDATE",
       workspaceId,
@@ -100,6 +103,10 @@ export async function deleteSection(req, res) {
     ? { sectionId: id, workspaceId, deleted: { $ne: true } }
     : { sectionId: id, owner: userId, deleted: { $ne: true } };
 
+  const deletedTasks = workspaceId
+    ? await Task.find({ sectionId: id, deleted: false }).select("taskId workspaceId").lean()
+    : [];
+
   await Section.updateOne(filter, { $set: { deleted: true, deletedAt: now, updatedAt: now } });
 
   // Soft-delete tasks in this section
@@ -109,6 +116,14 @@ export async function deleteSection(req, res) {
   await Task.updateMany(taskFilter, { $set: { deleted: true, deletedAt: now, updatedAt: now } });
 
   if (workspaceId) {
+    await bumpWorkspaceSync(workspaceId);
+    for (const task of deletedTasks) {
+      req.app.get("wsServer")?.broadcastToWorkspace(workspaceId, {
+        type: "TASK_DELETE",
+        workspaceId,
+        taskId: task.taskId,
+      });
+    }
     req.app.get("wsServer")?.broadcastToWorkspace(workspaceId, {
       type: "SECTION_DELETE",
       workspaceId,

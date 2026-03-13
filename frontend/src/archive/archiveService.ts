@@ -1,17 +1,59 @@
+type WorkerResponse<T> =
+  | { id: number; ok: true; result: T }
+  | { id: number; ok: false; error: string };
 
-// AES-GCM encryption/decryption for archived tasks
-// Same logic as old archive.worker.js but runs in main thread (React is fast enough for task payloads)
+let workerPromise: Promise<Worker> | null = null;
+let requestId = 0;
+const pending = new Map<
+  number,
+  {
+    resolve: (value: any) => void;
+    reject: (reason?: unknown) => void;
+  }
+>();
 
-const SECRET_KEY = "archive-secret-key-v2";
-const encoder = new TextEncoder();
-const decoder = new TextDecoder();
+function getArchiveWorker(): Promise<Worker> {
+  if (!workerPromise) {
+    workerPromise = Promise.resolve(
+      new Worker(new URL("./archive.worker.ts", import.meta.url), { type: "module" })
+    );
 
-async function getDerivedKey(): Promise<CryptoKey> {
-  const raw = await crypto.subtle.digest("SHA-256", encoder.encode(SECRET_KEY));
-  return crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, [
-    "encrypt",
-    "decrypt",
-  ]);
+    workerPromise.then((worker) => {
+      worker.onmessage = (event: MessageEvent<WorkerResponse<unknown>>) => {
+        const message = event.data;
+        const request = pending.get(message.id);
+        if (!request) return;
+
+        pending.delete(message.id);
+        if (message.ok) {
+          request.resolve(message.result);
+          return;
+        }
+
+        request.reject(new Error(message.error));
+      };
+
+      worker.onerror = (event) => {
+        const error = new Error(event.message || "Archive worker crashed");
+        for (const [id, request] of pending) {
+          request.reject(error);
+          pending.delete(id);
+        }
+      };
+    });
+  }
+
+  return workerPromise;
+}
+
+async function runWorkerTask<T>(type: "encrypt" | "decrypt", payload: object | EncryptedPayload): Promise<T> {
+  const worker = await getArchiveWorker();
+  const id = ++requestId;
+
+  return new Promise<T>((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    worker.postMessage({ id, type, payload });
+  });
 }
 
 export interface EncryptedPayload {
@@ -20,29 +62,9 @@ export interface EncryptedPayload {
 }
 
 export async function encryptTask(data: object): Promise<EncryptedPayload> {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const key = await getDerivedKey();
-
-  const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
-    key,
-    encoder.encode(JSON.stringify(data))
-  );
-
-  return {
-    iv: Array.from(iv),
-    payload: Array.from(new Uint8Array(encrypted)),
-  };
+  return runWorkerTask<EncryptedPayload>("encrypt", data);
 }
 
 export async function decryptTask<T = object>(record: EncryptedPayload): Promise<T> {
-  const key = await getDerivedKey();
-
-  const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: new Uint8Array(record.iv) },
-    key,
-    new Uint8Array(record.payload)
-  );
-
-  return JSON.parse(decoder.decode(decrypted)) as T;
+  return runWorkerTask<T>("decrypt", record);
 }

@@ -1,8 +1,15 @@
 
+export interface TaskSubtask {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
 export interface Task {
   id:            string;
   text:          string;
   labels:        string[];
+  subtasks:      TaskSubtask[];
   completed:     boolean;
   archived:      boolean;
   deleted:       boolean;

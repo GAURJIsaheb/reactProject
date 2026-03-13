@@ -6,6 +6,8 @@ import { addTask, upsertQueue } from "@/infrastructure/lib/idb";
 import { apiUpdateTask } from "@/services/task.service";
 
 import type { Task } from "@/shared/types/task";
+import type { TaskSubtask } from "@/shared/types/task";
+import { hasIncompleteSubtasks, normalizeSubtasks } from "@/shared/lib/subtasks";
 import taskAddSound from "@/assests/taskadd.wav";
 import taskDeleteSound from "@/assests/deleteTask.wav";
 
@@ -35,7 +37,8 @@ type Props = {
     image: File | null,
     sectionId: string,
     reminderAt?: number | null,
-    labels?: string[]
+    labels?: string[],
+    subtasks?: Pick<TaskSubtask, "text">[]
   ) => Promise<Task | null>;
   deleteTask: (id: string) => void;
   reloadTasks: () => Promise<void>;
@@ -235,11 +238,14 @@ export function useTaskActions({
       id: string,
       text: string,
       labels: string[],
+      subtasks: TaskSubtask[],
       imageFile?: File | null,
       removeImage?: boolean,
       reminderAt?: number | null
     ): Promise<boolean> => {
       if (!userEmail) return false;
+      const existingTask = tasks.find((task) => task.id === id) ?? null;
+      const shouldForceIncomplete = hasIncompleteSubtasks(subtasks);
 
       const idbUpdate: Partial<Task> = {
         id,
@@ -248,7 +254,9 @@ export function useTaskActions({
         workspaceType: workspace,
         updatedAt: Date.now(),
         labels,
+        subtasks,
         reminderAt,
+        completed: shouldForceIncomplete ? false : existingTask?.completed,
         dirty: true,
       };
       if (removeImage) idbUpdate.image = null;
@@ -260,7 +268,14 @@ export function useTaskActions({
         taskId: id,
         userEmail,
         workspaceType: workspace,
-        payload: { text, labels, reminderAt, ...(removeImage ? { image: null } : {}) },
+        payload: {
+          text,
+          labels,
+          subtasks,
+          reminderAt,
+          ...(shouldForceIncomplete ? { completed: false } : {}),
+          ...(removeImage ? { image: null } : {}),
+        },
         retry: 0,
         nextRetry: Date.now(),
       });
@@ -269,7 +284,13 @@ export function useTaskActions({
         if (token) {
           const result = await apiUpdateTask(
             id,
-            { text, labels: JSON.stringify(labels), reminderAt },
+            {
+              text,
+              labels: JSON.stringify(labels),
+              subtasks: JSON.stringify(subtasks),
+              reminderAt,
+              ...(shouldForceIncomplete ? { completed: false } : {}),
+            },
             token,
             imageFile,
             removeImage
@@ -278,10 +299,12 @@ export function useTaskActions({
             id,
             text: result?.task?.text ?? text,
             labels: result?.task?.labels ?? labels,
+            subtasks: normalizeSubtasks(result?.task?.subtasks ?? subtasks),
             image: result?.task?.imageUrl ?? result?.task?.image ?? idbUpdate.image ?? null,
             imageUrl: result?.task?.imageUrl ?? null,
             imageUrlExpiry: result?.task?.imageUrlExpiry ?? null,
             reminderAt: result?.task?.reminderAt ?? reminderAt ?? null,
+            completed: result?.task?.completed ?? idbUpdate.completed ?? false,
             updatedAt: result?.task?.updatedAt ?? Date.now(),
             dirty: false,
             syncStatus: "synced",
@@ -295,7 +318,7 @@ export function useTaskActions({
       await reloadTasks();
       return true;
     },
-    [userEmail, workspace, token, reloadTasks]
+    [reloadTasks, tasks, token, userEmail, workspace]
   );
 
   const handleTaskAddInSection = useCallback((sectionId: string) => {

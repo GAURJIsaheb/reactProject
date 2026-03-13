@@ -1,8 +1,15 @@
 import { initDB} from "@/infrastructure/lib/idb";
 import { authHeaders } from "@/services/auth.service";
 import { mergeNotificationsFromServer } from "@/infrastructure/lib/idb";
+import { pruneSyncedTasksMissingOnServer } from "@/infrastructure/lib/idb";
+import { pruneSyncedSectionsMissingOnServer } from "@/infrastructure/lib/idb";
+import { normalizeSubtasks } from "@/shared/lib/subtasks";
 
 const API_BASE = "http://localhost:4000";
+
+function isBuiltInWorkspaceType(workspaceType: string) {
+  return workspaceType === "personal" || workspaceType === "professional";
+}
 
 // ─── Sync timestamp keys ──────────────────────────────────────────────────────
 // For collab workspaces we key by the server workspaceId so each member gets
@@ -27,6 +34,8 @@ export async function fetchWorkspaceId(
   workspaceType: string,
   token: string
 ): Promise<string | null> {
+  if (!isBuiltInWorkspaceType(workspaceType)) return null;
+
   try {
     const res = await fetch(
       `${API_BASE}/tasks/workspace-id?workspaceType=${workspaceType}`,
@@ -92,8 +101,24 @@ async function pullSections(
       await mergeSections(sections, userEmail, workspaceType, isCollab ? workspaceId : undefined);
     }
 
+    const currentParams = new URLSearchParams({ workspaceType });
+    if (workspaceId) currentParams.set("workspaceId", workspaceId);
+    const currentRes = await fetch(`${API_BASE}/sections?${currentParams.toString()}`, {
+      headers: authHeaders(token),
+    });
+    const currentSections = currentRes.ok ? await currentRes.json() : [];
+    if (currentSections.length > 0) {
+      await mergeSections(currentSections, userEmail, workspaceType, isCollab ? workspaceId : undefined);
+    }
+    const pruned = await pruneSyncedSectionsMissingOnServer(
+      userEmail,
+      workspaceType,
+      currentSections.map((section: any) => section.sectionId ?? section.id).filter(Boolean),
+      workspaceId
+    );
+
     localStorage.setItem(syncKey, String(syncedAt));
-    return sections.length > 0;
+    return sections.length > 0 || currentSections.length > 0 || pruned > 0;
   } catch {
     return false;
   }
@@ -125,8 +150,24 @@ async function pullTasks(
       await mergeTasks(tasks, userEmail, workspaceType, isCollab ? workspaceId : undefined);
     }
 
+    const currentParams = new URLSearchParams({ workspaceType });
+    if (workspaceId) currentParams.set("workspaceId", workspaceId);
+    const currentRes = await fetch(`${API_BASE}/tasks?${currentParams.toString()}`, {
+      headers: authHeaders(token),
+    });
+    const currentTasks = currentRes.ok ? await currentRes.json() : [];
+    if (currentTasks.length > 0) {
+      await mergeTasks(currentTasks, userEmail, workspaceType, isCollab ? workspaceId : undefined);
+    }
+    const pruned = await pruneSyncedTasksMissingOnServer(
+      userEmail,
+      workspaceType,
+      currentTasks.map((task: any) => task.taskId ?? task.id).filter(Boolean),
+      workspaceId
+    );
+
     localStorage.setItem(syncKey, String(syncedAt));
-    return tasks.length > 0;
+    return tasks.length > 0 || pruned > 0;
   } catch {
     return false;
   }
@@ -228,6 +269,7 @@ for (const task of serverTasks) {
   if (!existing || !localNewer) {
     await store.put({
       ...task,
+      subtasks: normalizeSubtasks(task.subtasks),
       userEmail,
       workspaceType,
       // Fix: always set workspaceId for collab — fall back to existing record's

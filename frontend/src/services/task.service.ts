@@ -1,6 +1,7 @@
 import { authHeaders } from "@/services/auth.service";
 import { addTask, pruneSyncedTasksMissingOnServer } from "@/infrastructure/lib/idb";
 import type { Task } from "@/shared/types/task";
+import { normalizeSubtasks } from "@/shared/lib/subtasks";
 
 const API_BASE = `http://${window.location.hostname}:4000`;
 
@@ -49,6 +50,7 @@ export async function fetchFromServer(
         id,
         text: t.text,
         labels: t.labels ?? [],
+        subtasks: normalizeSubtasks(t.subtasks),
         image: t.imageUrl ?? t.image ?? null, // signed URL if cached, otherwise S3 key
         imageUrl: t.imageUrl ?? null,
         imageUrlExpiry: t.imageUrlExpiry ?? null,
@@ -93,6 +95,7 @@ export async function fetchTasksFromServer(
     id: t.taskId ?? t.id,
     text: t.text,
     labels: t.labels ?? [],
+    subtasks: normalizeSubtasks(t.subtasks),
     completed: Boolean(t.completed),
     archived: Boolean(t.archived),
     deleted: Boolean(t.deleted),
@@ -121,6 +124,7 @@ export async function apiCreateTask(task: any, token: string, imageFile?: File |
     workspaceId: task.workspaceId ?? null,
     reminderAt: task.reminderAt ?? null,
     labels: JSON.stringify(task.labels ?? []),
+    subtasks: JSON.stringify(task.subtasks ?? []),
     ...(task.sectionId ? { sectionId: task.sectionId } : {}), // empty string nahi
   }, imageFile);
 
@@ -132,6 +136,18 @@ export async function apiCreateTask(task: any, token: string, imageFile?: File |
 
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new Error(getErrorMessage(data, "create failed"));
+  return data;
+}
+
+export async function apiBulkCreateTasks(tasks: any[], token: string) {
+  const res = await fetch(`${API_BASE}/tasks/bulk-create`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({ tasks }),
+  });
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(getErrorMessage(data, "bulk create failed"));
   return data;
 }
 
@@ -154,8 +170,9 @@ export async function apiUpdateTask(
     body: fd,
   });
 
-  if (!res.ok) throw new Error("update failed");
-  return res.json();
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(getErrorMessage(data, "update failed"));
+  return data;
 }
 
 export async function apiDeleteTask(id: string, token: string) {
