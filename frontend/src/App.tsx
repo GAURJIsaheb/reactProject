@@ -9,10 +9,7 @@ import ResetPassword from "./pages/ResetPassword/ResetPassword";
 import ForgotPassword from "./pages/ForgotPassword/ForgotPassword";
 import InviteAccept from "./pages/InviteAccept/InviteAccept";
 import CalendarPage from "./pages/Calendar/Calendar";
-
-
-
-const API = `http://${window.location.hostname}:4000`; 
+import { API_BASE } from "./infrastructure/api/base";
 
 function App() {
   const { token, setAuth, logout } = useAuthStore();
@@ -30,22 +27,23 @@ function App() {
     }
     try {
       // ── Step 1: Verify token + get user ─────────────────────────────────
-      const res = await fetch(`${API}/auth/me`, {
+      const res = await fetch(`${API_BASE}/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("auth/me failed");
       const data = await res.json();
-      setAuth(token, data.user.name, data.user.email, data.user.userId ,data.user.role);
+      setAuth(
+        token,
+        data.user.name,
+        data.user.email,
+        data.user.userId,
+        data.user.role,
+        data.user.avatarUrl ?? null
+      );
 
       // ── Step 2: Check admin role from /auth/me response  ────────
 
-      const roleRes = await fetch(`${API}/auth/role`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (roleRes.ok) {
-        const roleData = await roleRes.json();
-        setIsAdmin(roleData.role === "superadmin");
-      }
+      setIsAdmin(data.user.role === "superadmin");
 
     } catch {
       logout();

@@ -1,7 +1,7 @@
 import { Task } from "../models/Task.model.js";
 import { User } from "../models/User.model.js";
 import { Archive } from "../models/Archive.model.js";
-
+import { AnalyticsSnapshot } from "../models/AnalyticsSnapshot.model.js";
 //helper: payload formatter
 
 function buildAnalyticsPayload({
@@ -18,7 +18,14 @@ function buildAnalyticsPayload({
   scope,
 }) {
   return {
-    taskStatusCounts: taskStatusCounts[0] || {},
+    taskStatusCounts: taskStatusCounts[0] || {
+      total: 0,
+      active: 0,
+      completed: 0,
+      archived: 0,
+      deleted: 0,
+      withImage: 0,
+    },
     taskPerUser,
     topUsers,
     activityByHour,
@@ -26,13 +33,17 @@ function buildAnalyticsPayload({
     recentActivity,
     totalUsers: totalUsers || 0,
     growthOverTime,
-    archiveStats: archiveStats[0] || {},
+    archiveStats: archiveStats[0] || {
+      total: 0,
+      restored: 0,
+      pending: 0,
+    },
     completionRate,
     scope,
   };
 }
 
-function parseAnalyticsScope(query = {}) {
+export function parseAnalyticsScope(query = {}) {
   const now = new Date();
   const mode = query.mode === "year" ? "year" : "month";
   const parsedYear = Number(query.year);
@@ -65,7 +76,7 @@ function parseAnalyticsScope(query = {}) {
 
 // DB analytics 
 
-async function runAnalyticsQueries(scope) {
+export async function runAnalyticsQueries(scope) {
   const { startAt, endAt, mode } = scope;
   const createdRangeMatch = { createdAt: { $gte: startAt, $lt: endAt } };
   const updatedRangeMatch = { updatedAt: { $gte: startAt, $lt: endAt } };
@@ -298,12 +309,37 @@ async function runAnalyticsQueries(scope) {
   });
 }
 
-//controller
-
+//controller ---- > reads from snapshot, falls back to live if missing
 export async function getAnalytics(req, res) {
   const scope = parseAnalyticsScope(req.query);
+  const forceRefresh = req.query.refresh === "true";
+
+  if (!forceRefresh) {
+    const cached = await AnalyticsSnapshot.findOne({ label: scope.label });
+    if (cached) {
+      const { _id, __v, ...payload } = cached.toObject();
+      return res.json({ ...payload, fromCache: true });
+    }
+  }
+
+  // No snapshot yet — compute live and store it
   const payload = await runAnalyticsQueries(scope);
-  return res.json(payload);
+  
+  // Store async, don't wait
+  AnalyticsSnapshot.findOneAndUpdate(
+    { label: scope.label },
+    {
+      label: scope.label,
+      mode: scope.mode,
+      year: scope.year,
+      month: scope.month,
+      ...payload,
+      computedAt: Date.now(),
+    },
+    { upsert: true }
+  ).catch(console.error);
+
+  return res.json({ ...payload, fromCache: false });
 }
 
 //users list

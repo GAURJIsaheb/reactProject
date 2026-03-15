@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useState } from "react";
 import { useAuthStore } from "@/zustand/authStore";
-import { useTasksEngine } from "@/hooks/useTasksEngine";
-import { useSectionsEngine } from "@/hooks/useSectionsEngine";
+import { useTasksEngine } from "@/features/tasks/hooks/useTasksEngine";
+import { useSectionsEngine } from "@/features/sections/hooks/useSectionsEngine";
 import { useTheme } from "@/shared/components/toggleTheme/theme";
 import { toast } from "sonner";
 import type { WorkspaceTemplate } from "@/shared/data/workspaceTemplates";
@@ -9,12 +9,12 @@ import type { WorkspaceTemplate } from "@/shared/data/workspaceTemplates";
 import Sidebar from "./components/sidebar/Sidebar";
 import StatsBar from "./components/StatsBar";
 import SearchBar from "./components/SearchBar";
-import Archive from "@/archive/archive";
+import Archive from "@/features/archive/archive";
 import KanbanBoard from "./kanban/KanbanBoard";
 import EmptyBoardState from "./components/EmptyBoardState";
 import KanbanSkeleton from "./components/KanbanSkeleton";
 
-import ViewTaskDialog from "@/shared/components/tasks/editTaskDialog";
+import ViewTaskDialog from "@/features/tasks/ui/ViewTaskDialog";
 
 import { useDashboardState } from "./hooks/useDashboardState";
 import { useDashboardDerived } from "./hooks/useDashboardDerived";
@@ -164,9 +164,6 @@ export default function Dashboard() {
       await loadSections();
 
       // 3) Fetch fresh sections directly from the service layer.
-      //    We can't rely on `sections` React state here because the
-      //    callback closure captured the old value. Fetching from the
-      //    API gives us the real, up-to-date list with IDs.
       const { default: svcFetch } = await import("@/services/section.service").then(
         (m) => ({ default: m.fetchSections })
       );

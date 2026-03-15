@@ -50,7 +50,7 @@ export function DayPanel({
         </div>
       ) : selectedDayReminders.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 py-10 text-gray-500">
-          <span className="text-2xl opacity-50">✨</span>
+          <span className="text-2xl opacity-50">🛎️</span>
           <p className="text-sm">No reminders this day</p>
         </div>
       ) : (

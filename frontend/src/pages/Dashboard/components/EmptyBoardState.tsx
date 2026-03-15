@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sparkles, Plus, Loader2 } from "lucide-react";
+import { Play, Plus, Loader2 } from "lucide-react";
 import {
   WORKSPACE_TEMPLATES,
   type WorkspaceTemplate,
@@ -30,7 +30,7 @@ export default function EmptyBoardState({ onCreateFirst, onApplyTemplate }: Prop
       {/* Header */}
       <div className="empty-board-header">
         <div className="empty-board-icon">
-          <Sparkles size={28} />
+          <Play size={28} />
         </div>
         <p className="empty-board-title">Get started</p>
         <p className="empty-board-subtitle">

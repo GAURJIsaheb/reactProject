@@ -1,8 +1,15 @@
 import express from "express";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { loginRateLimiter } from "../middlewares/rateLimiter.js";
+import { upload } from "../s3/upload.middleware.js";
 import { asyncHandler } from "../tryCatch/async.js";
-import {getCurrentUser,getCurrentUserRole,login,signup,} from "../controllers/auth.controller.js";
+import {
+  getCurrentUser,
+  getCurrentUserRole,
+  login,
+  signup,
+  uploadProfileAvatar,
+} from "../controllers/auth.controller.js";
 
 const router = express.Router();
 
@@ -19,6 +26,13 @@ router.get("/me",//Frontend sends the token in header--->Authorization: Bearer e
 router.get("/role",
   requireAuth,
   asyncHandler(getCurrentUserRole)
+);
+
+router.post(
+  "/avatar",
+  requireAuth,
+  upload.single("avatar"),
+  asyncHandler(uploadProfileAvatar)
 );
 
 export default router;

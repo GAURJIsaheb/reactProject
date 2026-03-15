@@ -4,7 +4,7 @@ import type { Task } from "@/shared/types/task";
 import { saveLocalTask } from "@/hooks/indexdbLayer";
 import { normalizeSubtasks } from "@/shared/lib/subtasks";
 
-import { encryptTask, decryptTask } from "./archiveService";
+import { encryptTask, decryptTask } from "./archive.worker-client";
 import {
   getAllArchivedTasks,
   saveArchivedToDB,
@@ -28,7 +28,7 @@ import {
   apiFetchArchivedTasks,
   apiRestoreTask,
   apiRestoreAllTasks,
-} from "../services/archive.service";
+} from "../../services/archive.service";
 
 type ArchiveContext = {
   workspaceType: string;

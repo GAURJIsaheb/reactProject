@@ -8,7 +8,7 @@ import {
   clearAllArchivedFromDB,
 } from "@/infrastructure/lib/idb";
 
-import type { EncryptedPayload } from "./archiveService";
+import type { EncryptedPayload } from "./archive.worker-client";
 
 export interface ArchivedTask {
   id: string;

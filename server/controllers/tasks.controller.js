@@ -17,6 +17,11 @@ import {
 } from '../utils/workspaceDefaults.js';
 import { TASK_PUBLIC_PROJECTION } from '../utils/taskProjection.js';
 import { bumpWorkspaceSync } from '../utils/workspaceSync.js';
+import {
+  canCompleteTask,
+  hasIncompleteSubtasks,
+  SUBTASKS_INCOMPLETE_ERROR,
+} from '../utils/taskRules.js';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -105,10 +110,6 @@ function normalizeSubtasks(subtasks) {
   }
 
   return normalized;
-}
-
-function hasIncompleteSubtasks(subtasks) {
-  return Array.isArray(subtasks) && subtasks.some((subtask) => !subtask.completed);
 }
 
 function getCallerId(req) {
@@ -402,8 +403,8 @@ export const updateTask = async (req, res) => {
     task.completed = false;
   }
 
-  if (task.completed && hasIncompleteSubtasks(task.subtasks)) {
-    return res.status(400).json({ error: 'Complete all subtasks before completing this task', code: 'SUBTASKS_INCOMPLETE' });
+  if (task.completed && !canCompleteTask(task.subtasks)) {
+    return res.status(400).json(SUBTASKS_INCOMPLETE_ERROR);
   }
 
   task.updatedAt = Date.now();
@@ -494,7 +495,7 @@ export const bulkUpdateTasks = async (req, res) => {
       normalizedPayload.completed = false;
     }
 
-    if (normalizedPayload.completed === true && hasIncompleteSubtasks(effectiveSubtasks)) {
+    if (normalizedPayload.completed === true && !canCompleteTask(effectiveSubtasks)) {
       return null;
     }
 
@@ -507,7 +508,7 @@ export const bulkUpdateTasks = async (req, res) => {
   });
 
   if (bulkOps.some((op) => op === null)) {
-    return res.status(400).json({ error: 'Complete all subtasks before completing this task', code: 'SUBTASKS_INCOMPLETE' });
+    return res.status(400).json(SUBTASKS_INCOMPLETE_ERROR);
   }
 
   const result = await Task.bulkWrite(bulkOps, { ordered: false });

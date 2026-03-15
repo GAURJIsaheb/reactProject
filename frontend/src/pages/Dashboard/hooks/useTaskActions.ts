@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { addTask, upsertQueue } from "@/infrastructure/lib/idb";
 import { apiUpdateTask } from "@/services/task.service";
+import { normalizeLabelsInput } from "@/features/tasks/lib/taskMappers";
 
 import type { Task } from "@/shared/types/task";
 import type { TaskSubtask } from "@/shared/types/task";
@@ -56,25 +57,6 @@ function playSuccessSound() {
 
 function deleteTaskSound() {
   try { new Audio(taskDeleteSound).play(); } catch { /* silent */ }
-}
-
-function normalizeLabelsInput(value: string): string[] {
-  const seen = new Set<string>();
-  const labels: string[] = [];
-
-  for (const part of value.split(",")) {
-    const label = part.trim().replace(/\s+/g, " ").slice(0, 24);
-    if (!label) continue;
-
-    const key = label.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    labels.push(label);
-
-    if (labels.length === 3) break;
-  }
-
-  return labels;
 }
 
 export function useTaskActions({

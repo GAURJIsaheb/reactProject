@@ -220,7 +220,7 @@ export default function InviteModal({ workspaceId, workspaceName, isOwner, onClo
 
         <div className="grid gap-0 md:grid-cols-[1.1fr_0.9fr]">
           <div className="p-5 border-b md:border-b-0 md:border-r border-white/8">
-            <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+            <div className="rounded-2xl border border-white/8 bg-white/3 p-4">
               <div className="flex items-center gap-2 mb-2">
                 <ShieldCheck size={14} className="text-indigo-300" />
                 <p className="text-sm font-semibold text-slate-100">Invite teammate</p>
@@ -318,7 +318,7 @@ export default function InviteModal({ workspaceId, workspaceName, isOwner, onClo
                     Use the left panel to invite. Use tabs to review joined members and pending requests.
                   </p>
                 </div>
-                <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4 text-xs text-slate-400 space-y-2">
+                <div className="rounded-2xl border border-white/8 bg-white/3 p-4 text-xs text-slate-400 space-y-2">
                   <p>Owner can revoke pending invites anytime.</p>
                   <p>Joined members move from pending list to members automatically after accept.</p>
                   <p>Invite links expire after 7 days.</p>

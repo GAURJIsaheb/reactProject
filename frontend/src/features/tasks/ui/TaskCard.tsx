@@ -1,9 +1,9 @@
 import { memo, useMemo, useState } from "react";
 import { Trash2, Check, ListTodo, Sparkles } from "lucide-react";
-import type { Task } from "@/shared/types/task";
-import { useAuthStore } from "@/zustand/authStore";
 import { apiFetchTaskImageUrl } from "@/services/task.service";
 import { getSubtaskProgressLabel, hasIncompleteSubtasks } from "@/shared/lib/subtasks";
+import type { Task } from "@/shared/types/task";
+import { useAuthStore } from "@/zustand/authStore";
 
 const CARD_PALETTES = [
   {
@@ -93,9 +93,11 @@ function TaskCard({
   const [showImage, setShowImage] = useState(false);
   const [loadingImage, setLoadingImage] = useState(false);
   const [resolvedImageUrl, setResolvedImageUrl] = useState<string | null>(
-    (task.imageUrl && /^https?:\/\//.test(task.imageUrl))
+    task.imageUrl && /^https?:\/\//.test(task.imageUrl)
       ? task.imageUrl
-      : (task.image && /^https?:\/\//.test(task.image) ? task.image : null)
+      : task.image && /^https?:\/\//.test(task.image)
+        ? task.image
+        : null
   );
   const { title, description } = useMemo(() => {
     const raw = (task.text ?? "").trim();
@@ -113,8 +115,8 @@ function TaskCard({
 
   return (
     <div
-      onClick={(e) => {
-        if ((e.target as HTMLElement).closest("button,[role=menuitem]")) return;
+      onClick={(event) => {
+        if ((event.target as HTMLElement).closest("button,[role=menuitem]")) return;
         onView(task);
       }}
       className={[
@@ -136,9 +138,9 @@ function TaskCard({
       <div className="flex items-start gap-2.5">
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle(task.id, e);
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggle(task.id, event);
           }}
           className={[
             "shrink-0 mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center",
@@ -161,9 +163,7 @@ function TaskCard({
           <p
             className={[
               "font-bold text-[14.5px] leading-tight truncate transition-all duration-300",
-              isCompleted
-                ? "line-through decoration-2 text-gray-500/80"
-                : palette.text,
+              isCompleted ? "line-through decoration-2 text-gray-500/80" : palette.text,
             ].join(" ")}
             style={
               isCompleted
@@ -192,7 +192,7 @@ function TaskCard({
         </div>
 
         <div
-          onClick={(e) => e.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
           className={`shrink-0 transition-opacity ${
             isCompleted ? "opacity-40" : "opacity-60 hover:opacity-100"
           }`}
@@ -213,25 +213,19 @@ function TaskCard({
           <div className="flex">
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
+              onClick={(event) => {
+                event.stopPropagation();
                 const next = !showImage;
                 setShowImage(next);
 
-                if (
-                  next &&
-                  !resolvedImageUrl &&
-                  task.image &&
-                  token &&
-                  !loadingImage
-                ) {
+                if (next && !resolvedImageUrl && task.image && token && !loadingImage) {
                   setLoadingImage(true);
                   apiFetchTaskImageUrl(task.id, token)
                     .then((data) => {
                       if (data.imageUrl) setResolvedImageUrl(data.imageUrl);
                     })
                     .catch(() => {
-                      // non-blocking UI action
+                      // Non-blocking UI action.
                     })
                     .finally(() => setLoadingImage(false));
                 }
@@ -319,9 +313,7 @@ function TaskCard({
         <div className="flex items-center gap-1.5">
           <div
             className={`w-1.5 h-1.5 rounded-full ${
-              task.syncStatus === "synced"
-                ? "bg-emerald-500"
-                : "bg-amber-400 animate-pulse"
+              task.syncStatus === "synced" ? "bg-emerald-500" : "bg-amber-400 animate-pulse"
             }`}
           />
           <span

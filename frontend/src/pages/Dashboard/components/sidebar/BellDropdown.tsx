@@ -59,21 +59,21 @@ export default function BellDropdown({
         zIndex: 9999,
       }}
       className="w-80 max-w-[85vw] rounded-2xl border border-white/10
-      bg-[#121625] shadow-[0_20px_50px_rgba(0,0,0,0.65)] p-3"
+      bg-background shadow-[0_20px_50px_rgba(0,0,0,0.65)] p-3"
     >
       <div className="flex items-center justify-between mb-2">
         <p className="text-[12px] font-bold text-foreground">Reminders</p>
 
         <button
           onClick={onMarkAllRead}
-          className="text-[11px] text-indigo-300 hover:text-indigo-200"
+          className="text-[11px] text-foreground hover:text-indigo-200"
         >
           Mark all read
         </button>
       </div>
 
       {notifications.length === 0 ? (
-        <p className="text-[12px] text-slate-400 py-4 text-center">
+        <p className="text-[12px] text-foreground py-4 text-center">
           No reminder notifications yet
         </p>
       ) : (

@@ -19,7 +19,7 @@ import type {
 import GrowthChart from "./charts/GrowthChart";
 import TaskPie from "./charts/TaskPie";
 import HourChart from "./charts/HourChart";
-import DayChart from "./charts/DayChart";
+import DayChart from "../features/admin/ui/charts/DayChart";
 import TasksPerUserChart from "./charts/TasksPerUserChart";
 import TopUsers from "./components/TopUsers";
 import ActivityFeed from "./components/ActivityFeed";
@@ -55,12 +55,20 @@ type AnalyticsResponse = {
   taskPerUser: TaskPerUser[];
   topUsers: TopUser[];
   recentActivity: ActivityItem[];
+  fromCache?: boolean;
+  computedAt?: number;
 };
 
-async function fetchAnalytics(mode: AnalyticsMode, year: number, month: number): Promise<AnalyticsResponse> {
+async function fetchAnalytics(
+  mode: AnalyticsMode,
+  year: number,
+  month: number,
+  forceRefresh = false
+): Promise<AnalyticsResponse> {
   const token = localStorage.getItem("token");
   const params = new URLSearchParams({ mode, year: String(year) });
   if (mode === "month") params.set("month", String(month));
+  if (forceRefresh) params.set("refresh", "true");
 
   const res = await fetch(`${API}/admin/analytics?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -93,11 +101,11 @@ export default function AdminDashboard() {
     []
   );
 
-  const loadAnalytics = useCallback(async () => {
+  const loadAnalytics = useCallback(async (forceRefresh = false) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetchAnalytics(mode, year, month);
+      const response = await fetchAnalytics(mode, year, month, forceRefresh);
       setData(response);
       setLastRefresh(Date.now());
     } catch (err) {
@@ -139,7 +147,7 @@ export default function AdminDashboard() {
         }}
       />
 
-      <Header lastRefresh={lastRefresh} onRefresh={() => { void loadAnalytics(); }} />
+      <Header lastRefresh={lastRefresh} onRefresh={() => { void loadAnalytics(true); }} />
 
       <main className="relative z-10 max-w-[90%] mx-auto p-6 flex flex-col gap-6">
         <section className="flex flex-col gap-3 rounded-2xl border border-cyan-500/20 bg-zinc-950/70 p-4 sm:flex-row sm:items-end sm:justify-between">
@@ -195,12 +203,24 @@ export default function AdminDashboard() {
               </label>
             )}
 
-            <button
-              onClick={() => { void loadAnalytics(); }}
-              className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-200 transition hover:bg-cyan-500/20"
-            >
-              Refresh
-            </button>
+            <div className="flex flex-col items-end gap-1">
+          <button
+            onClick={() => { void loadAnalytics(true); }}
+            className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-200 transition hover:bg-cyan-500/20"
+          >
+            Refresh
+          </button>
+          {data?.fromCache && data?.computedAt && (
+            <span className="text-xs text-zinc-500">
+              cached · {new Date(data.computedAt).toLocaleString("en-IN", {
+                day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
+              })}
+            </span>
+          )}
+          {data && !data.fromCache && (
+            <span className="text-xs text-emerald-600">live</span>
+          )}
+        </div>
           </div>
         </section>
 

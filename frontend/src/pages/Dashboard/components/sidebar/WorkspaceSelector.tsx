@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { LoaderCircle, Plus, Trash2, X, UserRoundCog } from "lucide-react";
 import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
-import type { WorkspaceOption } from "@/hooks/useTasksEngine";
+import type { WorkspaceOption } from "@/features/workspaces/model/workspace";
 import {
   Card,
   CardContent,

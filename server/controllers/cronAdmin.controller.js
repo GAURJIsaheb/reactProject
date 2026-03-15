@@ -1,6 +1,8 @@
 import { Task }    from '../models/Task.model.js';
 import { Archive } from '../models/Archive.model.js';
 import { deleteImageFromS3 } from '../s3/s3Service.js';
+import { runAnalyticsQueries, parseAnalyticsScope } from "./admin.controller.js";
+import { AnalyticsSnapshot } from "../models/AnalyticsSnapshot.model.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -123,4 +125,43 @@ export async function runArchiveCleanup(req, res) {
 
   const deleted = await hardDeleteOldArchives();
   res.json({ dry: false, deleted });
+}
+
+
+
+
+
+//materlized schema or Storing Snapshot in db
+
+export async function computeAndStoreSnapshot(mode, year, month) {
+  const scope = parseAnalyticsScope({ mode, year, month });
+  const payload = await runAnalyticsQueries(scope);
+
+  await AnalyticsSnapshot.findOneAndUpdate(
+    { label: scope.label },
+    {
+      label: scope.label,
+      mode: scope.mode,
+      year: scope.year,
+      month: scope.month,
+      ...payload,
+      computedAt: Date.now(),
+    },
+    { upsert: true, new: true }
+  );
+
+  console.log(`[analytics] snapshot stored: ${scope.label}`);
+  return payload;
+}
+
+// Called by cron — computes current month + current year
+export async function refreshCurrentSnapshots() {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth() + 1;
+
+  await Promise.all([
+    computeAndStoreSnapshot("month", year, month),
+    computeAndStoreSnapshot("year", year, null),
+  ]);
 }

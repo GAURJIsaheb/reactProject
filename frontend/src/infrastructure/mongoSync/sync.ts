@@ -29,6 +29,47 @@ export function clearSyncTimestamps() {
     .forEach((k) => localStorage.removeItem(k));
 }
 
+async function pullWorkspaceResource<T>({
+  syncKey,
+  deltaUrl,
+  currentUrl,
+  token,
+  readDelta,
+  mergeItems,
+  pruneItems,
+}: {
+  syncKey: string;
+  deltaUrl: string;
+  currentUrl: string;
+  token: string;
+  readDelta: (data: any) => { items: T[]; syncedAt: number };
+  mergeItems: (items: T[]) => Promise<void>;
+  pruneItems: (items: T[]) => Promise<number>;
+}): Promise<boolean> {
+  try {
+    const deltaRes = await fetch(deltaUrl, { headers: authHeaders(token) });
+    if (!deltaRes.ok) return false;
+
+    const deltaData = await deltaRes.json();
+    const { items, syncedAt } = readDelta(deltaData);
+    if (items.length > 0) {
+      await mergeItems(items);
+    }
+
+    const currentRes = await fetch(currentUrl, { headers: authHeaders(token) });
+    const currentItems = currentRes.ok ? await currentRes.json() : [];
+    if (currentItems.length > 0) {
+      await mergeItems(currentItems);
+    }
+
+    const pruned = await pruneItems(currentItems);
+    localStorage.setItem(syncKey, String(syncedAt));
+    return items.length > 0 || currentItems.length > 0 || pruned > 0;
+  } catch {
+    return false;
+  }
+}
+
 // ─── Fetch workspaceId UUID from server ───────────────────────────────────────
 export async function fetchWorkspaceId(
   workspaceType: string,
@@ -76,52 +117,31 @@ async function pullSections(
   userEmail:     string,
   isCollab:      boolean
 ): Promise<boolean> {
-  // Key by workspaceId for collab (shared cursor), by type for personal
-  const syncKey     = isCollab ? sectionSyncKey(workspaceId) : sectionSyncKey(workspaceType);
+  const syncKey = isCollab ? sectionSyncKey(workspaceId) : sectionSyncKey(workspaceType);
   const lastSyncedAt = localStorage.getItem(syncKey);
-
-  // Collab: query by workspaceId so server returns ALL members' sections
-  // Personal: query by workspaceType (original behaviour)
   const param = isCollab
     ? `workspaceId=${workspaceId}`
     : `workspaceType=${workspaceType}`;
-
-  // For collab: NEVER send lastSyncedAt on the very first pull for this user
-  // so they always get the full history. After that, delta is fine.
   const deltaParam = lastSyncedAt ? `&lastSyncedAt=${lastSyncedAt}` : "";
-  const url = `${API_BASE}/sections/sync?${param}${deltaParam}`;
+  const currentParams = new URLSearchParams({ workspaceType });
+  if (workspaceId) currentParams.set("workspaceId", workspaceId);
 
-  try {
-    const res = await fetch(url, { headers: authHeaders(token) });
-    if (!res.ok) return false;
-
-    const { sections, syncedAt }: { sections: any[]; syncedAt: number } = await res.json();
-
-    if (sections.length > 0) {
-      await mergeSections(sections, userEmail, workspaceType, isCollab ? workspaceId : undefined);
-    }
-
-    const currentParams = new URLSearchParams({ workspaceType });
-    if (workspaceId) currentParams.set("workspaceId", workspaceId);
-    const currentRes = await fetch(`${API_BASE}/sections?${currentParams.toString()}`, {
-      headers: authHeaders(token),
-    });
-    const currentSections = currentRes.ok ? await currentRes.json() : [];
-    if (currentSections.length > 0) {
-      await mergeSections(currentSections, userEmail, workspaceType, isCollab ? workspaceId : undefined);
-    }
-    const pruned = await pruneSyncedSectionsMissingOnServer(
-      userEmail,
-      workspaceType,
-      currentSections.map((section: any) => section.sectionId ?? section.id).filter(Boolean),
-      workspaceId
-    );
-
-    localStorage.setItem(syncKey, String(syncedAt));
-    return sections.length > 0 || currentSections.length > 0 || pruned > 0;
-  } catch {
-    return false;
-  }
+  return pullWorkspaceResource({
+    syncKey,
+    deltaUrl: `${API_BASE}/sections/sync?${param}${deltaParam}`,
+    currentUrl: `${API_BASE}/sections?${currentParams.toString()}`,
+    token,
+    readDelta: (data) => ({ items: data.sections ?? [], syncedAt: data.syncedAt ?? Date.now() }),
+    mergeItems: (items) =>
+      mergeSections(items as any[], userEmail, workspaceType, isCollab ? workspaceId : undefined),
+    pruneItems: (items) =>
+      pruneSyncedSectionsMissingOnServer(
+        userEmail,
+        workspaceType,
+        (items as any[]).map((section: any) => section.sectionId ?? section.id).filter(Boolean),
+        workspaceId
+      ),
+  });
 }
 
 // ─── Pull tasks delta ─────────────────────────────────────────────────────────
@@ -134,43 +154,26 @@ async function pullTasks(
 ): Promise<boolean> {
   const syncKey      = taskSyncKey(workspaceId);
   const lastSyncedAt = localStorage.getItem(syncKey);
-
-  // For collab: on first pull by this user, omit lastSyncedAt so we get ALL
-  // historical tasks, not just deltas since some arbitrary timestamp.
   const deltaParam = lastSyncedAt ? `&lastSyncedAt=${lastSyncedAt}` : "";
-  const url = `${API_BASE}/tasks/sync?workspaceId=${workspaceId}${deltaParam}`;
+  const currentParams = new URLSearchParams({ workspaceType });
+  if (workspaceId) currentParams.set("workspaceId", workspaceId);
 
-  try {
-    const res = await fetch(url, { headers: authHeaders(token) });
-    if (!res.ok) return false;
-
-    const { tasks, syncedAt }: { tasks: any[]; syncedAt: number } = await res.json();
-
-    if (tasks.length > 0) {
-      await mergeTasks(tasks, userEmail, workspaceType, isCollab ? workspaceId : undefined);
-    }
-
-    const currentParams = new URLSearchParams({ workspaceType });
-    if (workspaceId) currentParams.set("workspaceId", workspaceId);
-    const currentRes = await fetch(`${API_BASE}/tasks?${currentParams.toString()}`, {
-      headers: authHeaders(token),
-    });
-    const currentTasks = currentRes.ok ? await currentRes.json() : [];
-    if (currentTasks.length > 0) {
-      await mergeTasks(currentTasks, userEmail, workspaceType, isCollab ? workspaceId : undefined);
-    }
-    const pruned = await pruneSyncedTasksMissingOnServer(
-      userEmail,
-      workspaceType,
-      currentTasks.map((task: any) => task.taskId ?? task.id).filter(Boolean),
-      workspaceId
-    );
-
-    localStorage.setItem(syncKey, String(syncedAt));
-    return tasks.length > 0 || pruned > 0;
-  } catch {
-    return false;
-  }
+  return pullWorkspaceResource({
+    syncKey,
+    deltaUrl: `${API_BASE}/tasks/sync?workspaceId=${workspaceId}${deltaParam}`,
+    currentUrl: `${API_BASE}/tasks?${currentParams.toString()}`,
+    token,
+    readDelta: (data) => ({ items: data.tasks ?? [], syncedAt: data.syncedAt ?? Date.now() }),
+    mergeItems: (items) =>
+      mergeTasks(items as any[], userEmail, workspaceType, isCollab ? workspaceId : undefined),
+    pruneItems: (items) =>
+      pruneSyncedTasksMissingOnServer(
+        userEmail,
+        workspaceType,
+        (items as any[]).map((task: any) => task.taskId ?? task.id).filter(Boolean),
+        workspaceId
+      ),
+  });
 }
 
 // ─── Pull notifications delta ─────────────────────────────────────────────────

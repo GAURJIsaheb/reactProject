@@ -1,4 +1,4 @@
-import type { WorkspaceOption } from "@/hooks/useTasksEngine";
+import type { WorkspaceOption } from "@/features/workspaces/model/workspace";
 
 export type ReminderNotification = {
   id: string;

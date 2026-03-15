@@ -1,5 +1,5 @@
 import { DragOverlay } from "@dnd-kit/core";
-import TaskCard from "@/shared/components/tasks/TaskCard";
+import TaskCard from "@/features/tasks/ui/TaskCard";
 import type { Task } from "@/shared/types/task";
 import type { Section } from "@/shared/types/section";
 

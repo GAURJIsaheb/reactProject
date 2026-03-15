@@ -1,5 +1,5 @@
 import type { Section } from "@/shared/types/section";
-import type { WorkspaceOption } from "@/hooks/useTasksEngine";
+import type { WorkspaceOption } from "@/features/workspaces/model/workspace";
 
 function workspaceOptionsKey(email: string) {
   return `workspace-options:${email}`;

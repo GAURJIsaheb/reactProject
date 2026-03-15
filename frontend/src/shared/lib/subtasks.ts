@@ -31,6 +31,17 @@ export function hasIncompleteSubtasks(subtasks: TaskSubtask[] | null | undefined
   return Array.isArray(subtasks) && subtasks.some((subtask) => !subtask.completed);
 }
 
+export function cannotCompleteTask(subtasks: TaskSubtask[] | null | undefined): boolean {
+  return hasIncompleteSubtasks(subtasks);
+}
+
+export function getIncompleteSubtasksMessage() {
+  return {
+    title: "Subtasks first",
+    description: "Finish all subtasks before marking the main task complete.",
+  };
+}
+
 export function getSubtaskProgressLabel(subtasks: TaskSubtask[] | null | undefined): string | null {
   if (!Array.isArray(subtasks) || subtasks.length === 0) return null;
   const completed = subtasks.filter((subtask) => subtask.completed).length;

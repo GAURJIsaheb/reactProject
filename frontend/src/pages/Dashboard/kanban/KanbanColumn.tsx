@@ -9,7 +9,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Pencil, Trash2, Check, X, Plus, Sparkles } from "lucide-react";
 import type { Section } from "@/shared/types/section";
 import type { Task } from "@/shared/types/task";
-import TaskCard from "@/shared/components/tasks/TaskCard";
+import TaskCard from "@/features/tasks/ui/TaskCard";
 
 // ─── Per-column accent palette ────────────────────────────────────────────────
 

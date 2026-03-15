@@ -3,6 +3,7 @@ import {
   hardDeleteOldTasks,
   hardDeleteOldArchives,
   warnExpiringTasks,
+  refreshCurrentSnapshots,
 } from '../controllers/cronAdmin.controller.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -69,11 +70,29 @@ function scheduleExpiryWarnings() {
   log('expiry-warning: scheduled — daily 08:00 IST');
 }
 
+// ─── Job 4: Pre-compute analytics snapshot 
+// every day at 01:00 IST (before task-cleanup at 02:00  ---> as to avoid concurrency issues due to hard deletion of data)
+function scheduleAnalyticsSnapshot() {
+  cron.schedule('0 1 * * *', async () => {
+    log('analytics-snapshot: starting');
+    try {
+      await refreshCurrentSnapshots();
+      log('analytics-snapshot: complete');
+    } catch (err) {
+      console.error('[CRON][analytics-snapshot] ERROR:', err.message);
+    }
+  }, { timezone: 'Asia/Kolkata' });
+
+  log('analytics-snapshot: scheduled — daily 01:00 IST');
+}
+
+
 // ─── Register all jobs (call once after DB connects) ─────────────────────────
 export function registerCronJobs() {//initialisation in server/index.js
   scheduleTaskCleanup();
   scheduleArchiveCleanup();
   scheduleExpiryWarnings();
+  scheduleAnalyticsSnapshot();
   log('All cron jobs registered ✓');
 }
 

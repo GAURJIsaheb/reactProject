@@ -1,4 +1,4 @@
-//a middleware/wrapper used for protected routes,,,it is using passport.js in it
+
 import passport from "../auth/passport.js"; 
 
 export function requireAuth(req, res, next) {
