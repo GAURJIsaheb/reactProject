@@ -1,7 +1,7 @@
 //Task loading + online-recovery sync
 import { useCallback, useEffect } from "react";
-import { initDB } from "@/infrastructure/lib/idb";
-import { getAllTasks as idbGetAllTasks } from "@/infrastructure/lib/idb";
+import { initDB } from "@/infrastructure/indexDb/idb";
+import { getAllTasks as idbGetAllTasks } from "@/infrastructure/indexDb/idb";
 import { processQueue } from "@/infrastructure/queue/syncQueue";
 import { fetchWorkspaceId, pullFromServer } from "@/infrastructure/mongoSync/sync";
 import { loadLocalTasks, loadWorkspaceTasks } from "../indexdbLayer";

@@ -154,8 +154,6 @@ async function resolveWorkspace(userId, workspaceType, workspaceId) {
   const normalizedWorkspaceId = String(workspaceId ?? '').trim();
 
   // Older clients can accidentally send the workspace slug instead of the UUID.
-  // Treat built-in slugs as "no explicit workspaceId" so personal/professional
-  // workspaces still auto-resolve instead of returning 404.
   if (normalizedWorkspaceId && normalizedWorkspaceId !== normalizedWorkspaceType) {
     return Workspace.findOne(
       {

@@ -4,7 +4,7 @@ import type { DragStartEvent, DragOverEvent, DragEndEvent } from "@dnd-kit/core"
 import type { Task } from "@/shared/types/task";
 import type { Section } from "@/shared/types/section";
 
-import { updateTaskSectionInIDB, upsertQueue } from "@/infrastructure/lib/idb";
+import { updateTaskSectionInIDB, upsertQueue } from "@/infrastructure/indexDb/idb";
 import { authHeaders } from "@/services/auth.service";
 import { v4 as uuidv4 } from "uuid";
 

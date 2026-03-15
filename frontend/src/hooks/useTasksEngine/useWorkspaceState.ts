@@ -1,7 +1,7 @@
 //All workspace state + CRUD 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { clearWorkspaceDataFromIDB } from "@/infrastructure/lib/idb";
+import { clearWorkspaceDataFromIDB } from "@/infrastructure/indexDb/idb";
 import { useAuthStore } from "@/zustand/authStore";
 import { workspaceStorageKey as workspaceKey } from "@/features/workspaces/lib/workspaceOptions";
 import {

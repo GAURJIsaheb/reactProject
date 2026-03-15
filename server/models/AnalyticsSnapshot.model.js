@@ -4,7 +4,7 @@ const analyticsSnapshotSchema = new mongoose.Schema({
   label: { type: String, required: true, unique: true }, // e.g. "2025-03" or "2025"
   mode: { type: String, enum: ["month", "year"], required: true },
   year: Number,
-  month: Number, // null for year mode
+  month: Number, 
   scope: Object,
   taskStatusCounts: Object,
   taskPerUser: Array,

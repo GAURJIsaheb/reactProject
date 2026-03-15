@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useAuthStore }        from "@/zustand/authStore";
-import { getAllTasksForUser }   from "@/infrastructure/lib/idb";
+import { getAllTasksForUser }   from "@/infrastructure/indexDb/idb";
 import {
   toReminderEvent,
   buildRemindersByDay,

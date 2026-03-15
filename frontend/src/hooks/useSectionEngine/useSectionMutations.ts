@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import { toast } from "sonner";
 import { useAuthStore } from "@/zustand/authStore";
 import type { Section } from "@/shared/types/section";
-import { upsertSection, deleteSectionFromIDB } from "@/infrastructure/lib/idb";
+import { upsertSection, deleteSectionFromIDB } from "@/infrastructure/indexDb/idb";
 import {
   createSectionApi,
   updateSectionApi,

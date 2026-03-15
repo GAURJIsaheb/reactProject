@@ -60,3 +60,42 @@ export type TooltipPayloadItem = {
   color?: string;
   fill?: string;  
 };
+
+
+
+
+
+export type AnalyticsMode = "month" | "year";
+
+export type AnalyticsResponse = {
+  scope: {
+    mode: AnalyticsMode;
+    year: number;
+    month: number | null;
+    startAt: number;
+    endAt: number;
+    label: string;
+  };
+  totalUsers: number;
+  taskStatusCounts: {
+    total: number;
+    active: number;
+    completed: number;
+    archived: number;
+    deleted: number;
+    withImage: number;
+  };
+  archiveStats: {
+    total: number;
+    restored: number;
+  };
+  growthOverTime: GrowthPoint[];
+  completionRate: CompletionPoint[];
+  activityByDay: DayData[];
+  activityByHour: HourData[];
+  taskPerUser: TaskPerUser[];
+  topUsers: TopUser[];
+  recentActivity: ActivityItem[];
+  fromCache?: boolean;
+  computedAt?: number;
+};

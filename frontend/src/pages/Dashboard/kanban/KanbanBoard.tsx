@@ -40,12 +40,8 @@ const SECTIONS_PER_PAGE = 12;
 export default function KanbanBoard(props: Props) {
   const { token, userEmail } = useAuthStore();
 
-  // ── Local sections state so column reorder doesn't snap back ──
-  // This is the single source of truth for section order in the UI.
   const [localSections, setLocalSections] = useState<Section[]>(props.sections);
 
-  // Sync from parent only when sections are added/removed/renamed,
-  // NOT during a drag (the drag hook manages order via onSectionsReorder).
   useEffect(() => {
     setLocalSections(props.sections);
   }, [props.sections]);
@@ -57,9 +53,7 @@ export default function KanbanBoard(props: Props) {
     if (page > lastPage) setPage(lastPage);
   }, [localSections.length, page]);
 
-  // When the drag hook finishes a column reorder it calls this,
-  // which updates local state immediately (no snap-back) and also
-  // persists to the engine via props.onSectionsReorder.
+
   const handleSectionsReorder = useCallback(
     (reordered: Section[]) => {
       setLocalSections(reordered);         // instant UI update
@@ -72,7 +66,7 @@ export default function KanbanBoard(props: Props) {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
-  // IMPORTANT: pass localSections (not props.sections) so the hook's
+
   // sectionsRef always reflects the current rendered order.
   const drag = useKanbanDrag({
     sections: localSections,

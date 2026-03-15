@@ -22,6 +22,10 @@ router.get('/',               asyncHandler(getAllTasks));
 router.put('/bulk-update',    asyncHandler(bulkUpdateTasks));
 router.get('/:id/image-url',  asyncHandler(getTaskImageUrl));
 router.put('/:id',            upload.single('image'),asyncHandler( updateTask));
+/*
+upload.single("image")   ← multer intercepts requests with multipart/form-data
+So multer runs before createTask.
+ */
 router.delete('/bulk-delete', asyncHandler(bulkDeleteTasks));
 router.delete('/:id',         asyncHandler(deleteTask));
 

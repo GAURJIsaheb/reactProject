@@ -6,7 +6,7 @@ import {
   getAllArchivedTasks as idbGetAll,
   deleteArchivedFromDB,
   clearAllArchivedFromDB,
-} from "@/infrastructure/lib/idb";
+} from "@/infrastructure/indexDb/idb";
 
 import type { EncryptedPayload } from "./archive.worker-client";
 

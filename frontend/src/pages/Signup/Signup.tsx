@@ -3,7 +3,7 @@ import { Eye, EyeOff, Anchor,Check ,X} from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { signupUser } from "@/services/auth.service";
 import { useAuthStore } from "@/zustand/authStore";
-import { saveUser } from "@/infrastructure/lib/idb";
+import { saveUser } from "@/infrastructure/indexDb/idb";
 import { validateSignup } from "./validateSignup";
 
 interface PasswordRule {

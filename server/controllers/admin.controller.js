@@ -2,8 +2,9 @@ import { Task } from "../models/Task.model.js";
 import { User } from "../models/User.model.js";
 import { Archive } from "../models/Archive.model.js";
 import { AnalyticsSnapshot } from "../models/AnalyticsSnapshot.model.js";
-//helper: payload formatter
 
+
+//helper: payload formatter
 function buildAnalyticsPayload({
   taskStatusCounts,
   taskPerUser,
@@ -26,6 +27,7 @@ function buildAnalyticsPayload({
       deleted: 0,
       withImage: 0,
     },
+
     taskPerUser,
     topUsers,
     activityByHour,
@@ -38,6 +40,7 @@ function buildAnalyticsPayload({
       restored: 0,
       pending: 0,
     },
+
     completionRate,
     scope,
   };
@@ -49,20 +52,22 @@ export function parseAnalyticsScope(query = {}) {
   const parsedYear = Number(query.year);
   const year = Number.isInteger(parsedYear) && parsedYear >= 2000 && parsedYear <= 2100
     ? parsedYear
-    : now.getUTCFullYear();
+    : now.getUTCFullYear();//return year
 
   const parsedMonth = Number(query.month);
+
+  //Date.UTC(year, monthIndex, day, hour, minute, second, millisecond)
   const month = Number.isInteger(parsedMonth) && parsedMonth >= 1 && parsedMonth <= 12
     ? parsedMonth
     : now.getUTCMonth() + 1;
 
   const startAt = mode === "year"
-    ? Date.UTC(year, 0, 1, 0, 0, 0, 0)
-    : Date.UTC(year, month - 1, 1, 0, 0, 0, 0);
+    ? Date.UTC(year, 0, 1, 0, 0, 0, 0)//year wise
+    : Date.UTC(year, month - 1, 1, 0, 0, 0, 0);//month wise
 
   const endAt = mode === "year"
-    ? Date.UTC(year + 1, 0, 1, 0, 0, 0, 0)
-    : Date.UTC(year, month, 1, 0, 0, 0, 0);
+    ? Date.UTC(year + 1, 0, 1, 0, 0, 0, 0)//year wise
+    : Date.UTC(year, month, 1, 0, 0, 0, 0);//month wise
 
   return {
     mode,
@@ -95,7 +100,7 @@ export async function runAnalyticsQueries(scope) {
     archiveStats,
     completionRate,
   ] = await Promise.all([
-    Task.aggregate([
+    Task.aggregate([//overall taskStatusCounts
       { $match: createdRangeMatch },
       {
         $group: {
@@ -120,7 +125,7 @@ export async function runAnalyticsQueries(scope) {
       },
     ]),
 
-    Task.aggregate([
+    Task.aggregate([//task per user
       { $match: { ...createdRangeMatch, deleted: false } },
       {
         $group: {
@@ -151,7 +156,7 @@ export async function runAnalyticsQueries(scope) {
       },
     ]),
 
-    Task.aggregate([
+    Task.aggregate([//topUsers
       { $match: { ...updatedRangeMatch, deleted: false } },
       {
         $group: {
@@ -161,7 +166,7 @@ export async function runAnalyticsQueries(scope) {
           lastActive: { $max: "$updatedAt" },
         },
       },
-      { $sort: { avgVersion: -1, taskCount: -1 } },
+      { $sort: { avgVersion: -1, taskCount: -1 } },//--> ranking of users
       { $limit: 5 },
       {
         $lookup: {
@@ -183,21 +188,21 @@ export async function runAnalyticsQueries(scope) {
       },
     ]),
 
-    Task.aggregate([
+    Task.aggregate([//activityByHour
       { $match: { ...createdRangeMatch, deleted: false } },
-      { $addFields: { hour: { $hour: { $toDate: "$createdAt" } } } },
+      { $addFields: { hour: { $hour: { $toDate: "$createdAt" } } } },//timestamp to hour
       { $group: { _id: "$hour", count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]),
 
-    Task.aggregate([
+    Task.aggregate([//activityByDay
       { $match: { ...createdRangeMatch, deleted: false } },
       { $addFields: { dow: { $dayOfWeek: { $toDate: "$createdAt" } } } },
       { $group: { _id: "$dow", count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]),
 
-    Task.aggregate([
+    Task.aggregate([//recentActivity
       { $match: { ...updatedRangeMatch, deleted: false } },
       { $sort: { updatedAt: -1 } },
       { $limit: 20 },
@@ -224,9 +229,9 @@ export async function runAnalyticsQueries(scope) {
       },
     ]),
 
-    User.countDocuments({ createdAt: { $gte: startAt, $lt: endAt } }),
+    User.countDocuments({ createdAt: { $gte: startAt, $lt: endAt } }),//total users
 
-    Task.aggregate([
+    Task.aggregate([//growthOverTime
       {
         $match: {
           ...createdRangeMatch,
@@ -247,7 +252,7 @@ export async function runAnalyticsQueries(scope) {
       { $sort: { _id: 1 } },
     ]),
 
-    Archive.aggregate([
+    Archive.aggregate([//archvie stats
       {
         $match: archiveRangeMatch,
       },
@@ -261,7 +266,7 @@ export async function runAnalyticsQueries(scope) {
       },
     ]),
 
-    Task.aggregate([
+    Task.aggregate([//completionRate
       {
         $match: {
           ...createdRangeMatch,
@@ -315,7 +320,7 @@ export async function getAnalytics(req, res) {
   const forceRefresh = req.query.refresh === "true";
 
   if (!forceRefresh) {
-    const cached = await AnalyticsSnapshot.findOne({ label: scope.label });
+    const cached = await AnalyticsSnapshot.findOne({ label: scope.label });//Snapshot lookup
     if (cached) {
       const { _id, __v, ...payload } = cached.toObject();
       return res.json({ ...payload, fromCache: true });

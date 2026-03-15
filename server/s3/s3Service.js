@@ -7,7 +7,7 @@ const BUCKET     = process.env.AWS_BUCKET_NAME;
 const EXPIRES_IN = 7 * 24 * 60 * 60; // url expiration time,,,
 
 export async function uploadImageToS3(fileBuffer, mimeType, userId, folder = 'tasks') {
-  const ext = mimeType.split('/')[1] || 'jpg';//proper xtension png or jpeg...or fdefault jpg
+  const ext = mimeType.split('/')[1] || 'jpg';//proper xtension png or jpeg...or default jpg
   const key = `${folder}/${userId}/${uuidv4()}.${ext}`;
   
   console.log('🪣 Uploading to bucket:', process.env.AWS_BUCKET_NAME);

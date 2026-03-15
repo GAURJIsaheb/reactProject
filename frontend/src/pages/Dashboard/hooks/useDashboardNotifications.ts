@@ -5,7 +5,7 @@ import {
   markAllNotificationsReadInIDB,
   softDeleteNotificationInIDB,
   upsertNotification,
-} from "@/infrastructure/lib/idb";
+} from "@/infrastructure/indexDb/idb";
 import type { AppNotification } from "@/shared/types/notification";
 import type { Task } from "@/shared/types/task";
 import { apiDeleteNotification, apiMarkAllNotificationsRead } from "@/services/notification.service";

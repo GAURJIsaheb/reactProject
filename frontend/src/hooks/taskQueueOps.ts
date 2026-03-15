@@ -3,7 +3,7 @@ import {
   upsertQueue,
   removeTaskUpdatesFromQueue,
   removeFromQueue,
-} from "@/infrastructure/lib/idb";
+} from "@/infrastructure/indexDb/idb";
 
 export async function queueCreate(
   task: any,

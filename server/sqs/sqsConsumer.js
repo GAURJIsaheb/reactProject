@@ -38,7 +38,7 @@ async function pollQueue() {
   try {
     const response = await sqs.send(new ReceiveMessageCommand({
       QueueUrl:            QUEUE_URL,
-      MaxNumberOfMessages: 5,      // 5 msgs at a time
+      MaxNumberOfMessages: 5,      // 5 msgs at a time --> max:SQS lets a consumer fetch up to 10 messages per request.
       WaitTimeSeconds:     10,     
       VisibilityTimeout:   30,     // wait for 30 sec,,if not happen go back to sqs
     }));

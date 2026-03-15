@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 
-import { addTask, upsertQueue } from "@/infrastructure/lib/idb";
+import { addTask, upsertQueue } from "@/infrastructure/indexDb/idb";
 import { apiUpdateTask } from "@/services/task.service";
 import { normalizeLabelsInput } from "@/features/tasks/lib/taskMappers";
 

@@ -3,7 +3,7 @@ import { loginUser } from "@/services/auth.service";
 import { useAuthStore } from "@/zustand/authStore";
 import { Eye, EyeOff, Anchor } from "lucide-react";
 import { Link } from "react-router-dom";
-import { saveUser, clearAllUserData } from "@/infrastructure/lib/idb";
+import { saveUser, clearAllUserData } from "@/infrastructure/indexDb/idb";
 import { useNavigate } from "react-router-dom";
 
 export default function Login() {

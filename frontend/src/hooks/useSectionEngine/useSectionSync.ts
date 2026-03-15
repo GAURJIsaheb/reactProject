@@ -6,7 +6,7 @@ import {
   getAllSections,
   upsertSection,
   pruneSyncedSectionsMissingOnServer,
-} from "@/infrastructure/lib/idb";
+} from "@/infrastructure/indexDb/idb";
 import {
   fetchSections,
   createSectionApi,

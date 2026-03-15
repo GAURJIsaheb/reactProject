@@ -2,7 +2,7 @@
 import { useCallback, useRef } from "react";
 import { toast } from "sonner";
 import type { Task, TaskSubtask } from "@/shared/types/task";
-import { addTask as idbAddTask, deleteTaskFromIDB } from "@/infrastructure/lib/idb";
+import { addTask as idbAddTask, deleteTaskFromIDB } from "@/infrastructure/indexDb/idb";
 import {
   apiCreateTask,
   apiUpdateTask,

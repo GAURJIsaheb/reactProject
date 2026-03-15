@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useAuthStore } from "@/zustand/authStore";
-import { getTaskById } from "@/infrastructure/lib/idb";
+import { getTaskById } from "@/infrastructure/indexDb/idb";
 import { useCollabWebSocket } from "@/hooks/useCollabWebSocket";
 import { useWorkspaceState } from "@/hooks/useTasksEngine/useWorkspaceState";
 import { useTaskSync } from "@/hooks/useTasksEngine/useTaskSync";

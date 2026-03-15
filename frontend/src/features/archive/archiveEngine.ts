@@ -9,7 +9,7 @@ import {
   getAllArchivedTasks,
   saveArchivedToDB,
   deleteArchivedFromDB,
-} from "@/infrastructure/lib/idb";
+} from "@/infrastructure/indexDb/idb";
 
 export interface ArchivedTask {
   id: string;

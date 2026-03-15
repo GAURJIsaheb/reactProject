@@ -9,3 +9,10 @@ export const s3 = new S3Client({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
 });
+
+
+/*Price:
+Typical price:
+
+$0.023 per GB per month for the first 50 TB stored
+*/

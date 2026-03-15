@@ -1,7 +1,7 @@
 //Incoming WS events for sections.
 import { useCallback } from "react";
 import type { Section } from "@/shared/types/section";
-import { upsertSection, deleteSectionFromIDB } from "@/infrastructure/lib/idb";
+import { upsertSection, deleteSectionFromIDB } from "@/infrastructure/indexDb/idb";
 
 interface UseSectionWsHandlerParams {
   userEmail:            string | null;

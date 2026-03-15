@@ -1,8 +1,8 @@
 //WebSocket message dispatch
 import { useRef, useCallback } from "react";
 import { toast } from "sonner";
-import { clearWorkspaceDataFromIDB } from "@/infrastructure/lib/idb";
-import { addTask as idbAddTask, deleteTaskFromIDB } from "@/infrastructure/lib/idb";
+import { clearWorkspaceDataFromIDB } from "@/infrastructure/indexDb/idb";
+import { addTask as idbAddTask, deleteTaskFromIDB } from "@/infrastructure/indexDb/idb";
 import { normalizeSubtasks } from "@/shared/lib/subtasks";
 import type { Task } from "@/shared/types/task";
 import type { WorkspaceOption } from "@/features/workspaces/model/workspace";
