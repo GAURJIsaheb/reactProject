@@ -2,6 +2,9 @@ import { Task }    from '../models/Task.model.js';
 import { Archive } from '../models/Archive.model.js';
 import { deleteImageFromS3 } from '../s3/s3Service.js';
 import { runAnalyticsQueries, parseAnalyticsScope } from "./admin.controller.js";
+// ─── Shared DB helpers (used by both cron jobs & admin routes) ────────────────
+
+
 import { AnalyticsSnapshot } from "../models/AnalyticsSnapshot.model.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -9,8 +12,6 @@ import { AnalyticsSnapshot } from "../models/AnalyticsSnapshot.model.js";
 export const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 export const SIXTY_DAYS_MS  = 60 * 24 * 60 * 60 * 1000;
 export const TWENTY_FIVE_DAYS_MS = 25 * 24 * 60 * 60 * 1000;
-
-// ─── Shared DB helpers (used by both cron jobs & admin routes) ────────────────
 
 /** Hard-deletes soft-deleted tasks older than 30 days. Returns deleted count. */
 export async function hardDeleteOldTasks() {
@@ -62,12 +63,12 @@ export async function getCronStatus(req, res) {
   const now = Date.now();
 
   const [tasksPendingPurge, tasksSoonPurge, archivePendingPurge] =
-    await Promise.all([
+    await Promise.all([//ready for deletion
       Task.countDocuments({
         deleted:   true,
         deletedAt: { $lt: now - THIRTY_DAYS_MS },
       }),
-      Task.countDocuments({
+      Task.countDocuments({//5 days..warning deletion
         deleted:   true,
         deletedAt: { $lt: now - TWENTY_FIVE_DAYS_MS, $gt: now - THIRTY_DAYS_MS },
       }),

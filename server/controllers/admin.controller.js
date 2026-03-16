@@ -349,7 +349,7 @@ export async function getAnalytics(req, res) {
 
 //users list
 
-export async function getUsers(req, res) {
+export async function getUsers(req, res) {///No frontend just to show user list
   const usersList = await User.aggregate([
     {
       $lookup: {

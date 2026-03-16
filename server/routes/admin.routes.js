@@ -7,6 +7,6 @@ const router = express.Router();
 
 
 router.get('/analytics',    asyncHandler(getAnalytics));
-router.get('/users',        asyncHandler(getUsers));
+router.get('/users',        asyncHandler(getUsers));//No frontend just to show user list
 
 export default router;

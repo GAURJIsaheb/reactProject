@@ -46,7 +46,8 @@ export async function pullWorkspaceResource<T>({
     if (items.length > 0) await mergeItems(items);
 
     const currentRes   = await fetch(currentUrl, { headers: authHeaders(token) });
-    const currentItems = currentRes.ok ? await currentRes.json() : [];
+    const currentData  = currentRes.ok ? await currentRes.json() : {};
+    const currentItems = currentData.tasks ?? currentData.sections ?? [];
     if (currentItems.length > 0) await mergeItems(currentItems);
 
     const pruned = await pruneItems(currentItems);

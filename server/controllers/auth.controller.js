@@ -4,15 +4,8 @@ import passport from "../auth/passport.js";
 import { signToken } from "../auth/jwt.js";
 import { User } from "../models/User.model.js";
 import { Workspace } from "../models/Workspace.model.js";
-import {
-  deleteImageFromS3,
-  generateSignedUrl,
-  uploadImageToS3,
-} from "../s3/s3Service.js";
-import {
-  getDefaultWorkspaceEmoji,
-  getDefaultWorkspaceName,
-} from "../utils/workspaceDefaults.js";
+import {deleteImageFromS3,generateSignedUrl,uploadImageToS3,} from "../s3/s3Service.js";
+import {getDefaultWorkspaceEmoji,getDefaultWorkspaceName,} from "../utils/workspaceDefaults.js";
 
 async function buildAuthUserPayload(userDoc) {
   if (!userDoc) return null;

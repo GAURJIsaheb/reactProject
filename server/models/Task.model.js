@@ -40,16 +40,7 @@ taskSchema.index({ sectionId: 1, createdBy: 1, deleted: 1 });
 taskSchema.index({ deleted: 1, updatedAt: -1 });
 taskSchema.index({ workspaceId: 1, updatedAt: 1 });
 taskSchema.index({ workspaceId: 1, deleted: 1 }); //for workspace deletion
+taskSchema.index({ workspaceId: 1, deleted: 1, createdAt: -1 });//for pagination
 export const Task = mongoose.model('tasks', taskSchema);
 
 
-/*
-
-  taskSchema.index({ sectionId: 1, deleted: 1 });
-  
-  taskSchema.index({ deleted: 1, deletedAt: 1 });
-
-  taskSchema.index({ deleted: 1, createdBy: 1 });
-
-
- */

@@ -3,10 +3,9 @@ import { Task }      from '../models/Task.model.js';
 import { Workspace } from '../models/Workspace.model.js';
 import { normalizeWorkspaceType } from '../utils/workspaceDefaults.js';
 import { TASK_PUBLIC_PROJECTION } from '../utils/taskProjection.js';
-import { bumpWorkspaceSync } from '../utils/workspaceSync.js';
+import { bumpWorkspaceSync } from '../utils/workspaceSync.js';//increment version + updating(lastChangedAt and updatedAt)
 
 //helpers
-
 
 //Purpose: figure out which workspace we are working with and ensure the user has access.
 async function helper_resolveArchiveWorkspace(userId, workspaceId, workspaceType) {
@@ -81,14 +80,14 @@ export const bulkArchive = async (req, res) => {
     docs.map((doc) => ({
       updateOne: {
         filter: { _id: doc._id },
-        update: { $set: doc },
+        update: { $set: doc },//If found → overwrite fields.
         upsert: true,
       },
     })),
-    { ordered: false }
+    { ordered: false }//so that:failures don't block the rest.
   );
 
-  await Task.updateMany(
+  await Task.updateMany(//Mark tasks as archived
     { taskId: { $in: tasks.map(t => t.id) } },
     { $set: { archived: true, updatedAt: now } }
   );

@@ -3,8 +3,6 @@ import { Task }    from "../models/Task.model.js";
 import { bumpWorkspaceSync } from "../utils/workspaceSync.js";
 
 // Build a Mongoose filter depending on whether this is a collab workspace.
-// Collab → filter by workspaceId (any member can touch it).
-// Personal → filter by owner + workspaceType (original behaviour, unchanged).
 function wsFilter(req, extra = {}) {
   const { workspaceType, workspaceId } = { ...req.query, ...req.body };
   const { userId } = req.user;
