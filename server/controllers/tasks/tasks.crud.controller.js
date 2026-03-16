@@ -190,7 +190,7 @@ export const getAllTasks = async (req, res) => {
   ]);
 
   res.json({
-    tasks,
+    tasks: tasks.map(t => ({ ...t, id: t.taskId })),
     total,
     page:       pageNum,
     totalPages: Math.ceil(total / limitNum),

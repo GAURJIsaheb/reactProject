@@ -66,8 +66,30 @@ export function useSectionSync({
 
     if (sharedMode) {
       if (!workspaceId) { setSections([]); return; }
+
+      // Optimistic: IDB first
       const local = await getAllSections(userEmail, workspaceType, workspaceId);
       setSections(local);
+
+      if (!token) return;
+      try {
+        // Fetch from server and merge into IDB so sections are always fresh
+        const remote = await fetchSections(token, workspaceType, workspaceId);
+        for (const s of remote) {
+          await upsertSection({
+            ...s,
+            userEmail,
+            workspaceType,
+            workspaceId,
+          });
+        }
+        const serverIds = remote.map((s: Section) => s.id).filter(Boolean);
+        await pruneSyncedSectionsMissingOnServer(userEmail, workspaceType, serverIds, workspaceId);
+        const merged = await getAllSections(userEmail, workspaceType, workspaceId);
+        setSections(merged);
+      } catch {
+        // Offline — keep IDB data already set above
+      }
       return;
     }
 

@@ -103,7 +103,7 @@ export async function mergeTasks(
   if (!existing || !localNewer) {
     await store.put({
       ...task,
-      id:          key,   // ← normalize to always have .id
+      id:          key,   
       subtasks:    normalizeSubtasks(task.subtasks),
       userEmail,
       workspaceType,

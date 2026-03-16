@@ -16,7 +16,7 @@ export class CollabWsServer {
 
     try {
       const payload = verifyToken(token);
-      ws.userId = String(payload.id ?? payload._id ?? payload.sub);//store identity on socket
+      ws.userId = String(payload.userId ?? payload.id ?? payload._id ?? payload.sub);//store identity on socket
     } catch {
       ws.close(4001, 'Unauthorized');
       return;

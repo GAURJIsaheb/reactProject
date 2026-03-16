@@ -46,6 +46,17 @@ export function useCollabWebSocket({ authToken, workspaceId, onMessage }: Props)
     reconnectsRef.current = 0;
 
     function connect() {
+      // Detach handlers from any stale socket to prevent zombie listeners
+      // (React StrictMode mounts → cleanup → mounts again; without this the
+      //  first socket stays in the room and doubles every WS broadcast)
+      const stale = wsRef.current;
+      if (stale) {
+        stale.onopen    = null;
+        stale.onmessage = null;
+        stale.onclose   = null;
+        stale.onerror   = null;
+      }
+
       const ws = new WebSocket(`${WS_BASE}/ws?token=${authToken}`);
       wsRef.current = ws;
 
@@ -63,6 +74,7 @@ export function useCollabWebSocket({ authToken, workspaceId, onMessage }: Props)
 
       ws.onclose = (ev) => {
         if (unmountedRef.current) return;
+        if (ws !== wsRef.current)  return; // stale socket — ignore
         // 4001 = auth failure — don't reconnect
         if (ev.code === 4001) return;
         if (reconnectsRef.current < MAX_RECONNECTS) {
@@ -76,11 +88,20 @@ export function useCollabWebSocket({ authToken, workspaceId, onMessage }: Props)
 
     return () => {
       unmountedRef.current = true;
-      if (wsRef.current) {
-        if (wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({ type: 'LEAVE_WORKSPACE', workspaceId }));
+      const ws = wsRef.current;
+      wsRef.current = null; // clear ref immediately so reconnect guard works
+      if (ws) {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'LEAVE_WORKSPACE', workspaceId }));
+          ws.close();
+        } else if (ws.readyState === WebSocket.CONNECTING) {
+          // Defer close until after open — avoids "closed before connection
+          // established" browser error that StrictMode used to trigger
+          ws.onopen  = () => ws.close();
+          ws.onclose = null; // suppress reconnect on this teardown close
+        } else {
+          ws.close();
         }
-        wsRef.current.close();
       }
     };
   }, [authToken, workspaceId]);

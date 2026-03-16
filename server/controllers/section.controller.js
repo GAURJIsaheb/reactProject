@@ -27,7 +27,7 @@ export async function syncSections(req, res) {
 export async function getSections(req, res) {
   const filter   = wsFilter(req, { deleted: { $ne: true } });
   const sections = await Section.find(filter).sort({ order: 1 }).lean();
-  return res.json(sections);
+  return res.json(sections.map((s) => ({ ...s, id: s.sectionId })));
 }
 
 /* POST /sections ----------------------------------------------------------- */

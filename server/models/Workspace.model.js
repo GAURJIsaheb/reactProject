@@ -21,8 +21,7 @@ const workspaceSchema = new mongoose.Schema(
   { versionKey: false }
 );
 
-workspaceSchema.index({ owner: 1, type: 1, deleted: 1 });
-workspaceSchema.index({ deleted: 1, owner: 1 });
-workspaceSchema.index({ members: 1, deleted: 1 });
+workspaceSchema.index({ deleted: 1, owner: 1 });           
+workspaceSchema.index({ members: 1, deleted: 1 });  
 
 export const Workspace = mongoose.model("workspaces", workspaceSchema);

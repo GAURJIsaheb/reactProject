@@ -81,16 +81,23 @@ export const createWorkspace = asyncHandler(async (req, res) => {
     return res.status(200).json({ workspaceId: existing.workspaceId });
   }
 
-  await Workspace.create({
-    workspaceId,
-    owner: ownerId,
-    name: trimmedName,
-    type: "custom",
-    emoji: emojiToSave,
-    members: [],
-  });
+  //eliminating the race condition where two simultaneous requests both pass the existing check and both try to insert.
+  const workspace = await Workspace.findOneAndUpdate(
+  { owner: ownerId, name: trimmedName, deleted: false },
+  {
+    $setOnInsert: {
+      workspaceId,
+      owner: ownerId,
+      name: trimmedName,
+      type: "custom",
+      members: [],
+    },
+    $set: { emoji: emojiToSave },//// applies on both insert AND update
+  },
+  { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+);
 
-  return res.status(201).json({ workspaceId });
+return res.status(201).json({ workspaceId: workspace.workspaceId });
 });
 
 export const listMyWorkspaces = asyncHandler(async (req, res) => {
