@@ -7,7 +7,7 @@ import { User } from "../models/User.model.js";
 import { Task } from "../models/Task.model.js";
 import { Section } from "../models/Section.model.js";
 import { sendInviteEmail } from "../sqs/mailer.js";
-import { asyncHandler } from "../tryCatch/async.js";
+import { asyncHandler } from "../TryCatch/async.js";
 import {
   getWorkspaceDisplayName,
   getDefaultWorkspaceEmoji,

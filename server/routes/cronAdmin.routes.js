@@ -5,7 +5,7 @@ import {
   runTaskCleanup,
   runArchiveCleanup,
 } from '../controllers/cronAdmin.controller.js';
-import { asyncHandler } from '../tryCatch/async.js';
+import { asyncHandler } from '../TryCatch/async.js';
 
 const router = express.Router();
 

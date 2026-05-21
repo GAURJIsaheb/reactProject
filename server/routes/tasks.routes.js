@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { asyncHandler } from '../tryCatch/async.js';
+import { asyncHandler } from '../TryCatch/async.js';
 import { upload } from '../s3/upload.middleware.js';
 import {
   bulkCreateTasks,

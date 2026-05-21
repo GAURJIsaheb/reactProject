@@ -1,5 +1,5 @@
 import express from "express";
-import { asyncHandler } from "../tryCatch/async.js";
+import { asyncHandler } from "../TryCatch/async.js";
 import { syncSections,
   getSections,
   createSection,

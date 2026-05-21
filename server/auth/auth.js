@@ -1,7 +1,7 @@
 import express from "express";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { loginRateLimiter } from "../middlewares/rateLimiter.js";
-import { asyncHandler } from "../tryCatch/async.js";
+import { asyncHandler } from "../TryCatch/async.js";
 import {getCurrentUser,getCurrentUserRole,login,signup,} from "../controllers/auth.controller.js";
 
 const router = express.Router();

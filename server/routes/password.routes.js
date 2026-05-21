@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { forgotPassword, resetPassword } from '../controllers/password.controller.js';
 import { forgotPasswordRateLimiter } from '../middlewares/rateLimiter.js';
-import { asyncHandler } from '../tryCatch/async.js';
+import { asyncHandler } from '../TryCatch/async.js';
 
 const router = Router();
 

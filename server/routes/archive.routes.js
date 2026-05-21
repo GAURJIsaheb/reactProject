@@ -5,7 +5,7 @@ import {
   restoreOne,
   getArchive,
 } from '../controllers/archive.controller.js';
-import { asyncHandler } from '../tryCatch/async.js';
+import { asyncHandler } from '../TryCatch/async.js';
 
 const router = Router();
 

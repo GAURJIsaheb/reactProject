@@ -1,5 +1,5 @@
 import express from 'express';
-import { asyncHandler } from '../tryCatch/async.js';
+import { asyncHandler } from '../TryCatch/async.js';
 import { getAnalytics, getUsers } from '../controllers/admin.controller.js';
 
 const router = express.Router();
