@@ -5,7 +5,7 @@ import { pruneSyncedTasksMissingOnServer } from "@/infrastructure/lib/idb";
 import { pruneSyncedSectionsMissingOnServer } from "@/infrastructure/lib/idb";
 import { normalizeSubtasks } from "@/shared/lib/subtasks";
 
-const API_BASE = "http://localhost:4000";
+const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
 function isBuiltInWorkspaceType(workspaceType: string) {
   return workspaceType === "personal" || workspaceType === "professional";

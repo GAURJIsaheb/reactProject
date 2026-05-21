@@ -1,4 +1,4 @@
-const API = "http://localhost:4000";
+const API = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
 function getErrorMessage(data: { error?: string; message?: string } | null | undefined, fallback: string) {
   return data?.error || data?.message || fallback;

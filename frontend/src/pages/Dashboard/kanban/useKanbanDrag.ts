@@ -8,6 +8,8 @@ import { updateTaskSectionInIDB, upsertQueue } from "@/infrastructure/lib/idb";
 import { authHeaders } from "@/services/auth.service";
 import { v4 as uuidv4 } from "uuid";
 
+const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+
 export function useKanbanDrag({
   sections,
   tasks,
@@ -151,7 +153,7 @@ export function useKanbanDrag({
           });
 
           if (token) {
-            fetch(`http://localhost:4000/tasks/${taskId}`, {
+            fetch(`${API_BASE}/tasks/${taskId}`, {
               method: "PUT",
               headers: authHeaders(token),
               body: JSON.stringify(payload),
