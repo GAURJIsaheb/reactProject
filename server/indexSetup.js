@@ -16,7 +16,7 @@ export function createServer() {
 
 
   app.use(cors({
-      origin: ['http://localhost:5173', 'http://localhost:4000' ,'http://192.168.31.14:5173'],
+      origin: ['http://localhost:5173', 'http://localhost:4000' ,'http://192.168.31.14:5173' , 'https://offinity-tasks-ujzs.onrender.com'],
       credentials: true 
     }));
 
