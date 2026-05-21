@@ -12,7 +12,7 @@ import CalendarPage from "./pages/Calendar/Calendar";
 
 
 
-const API = `http://${window.location.hostname}:4000`; 
+const API = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
 function App() {
   const { token, setAuth, logout } = useAuthStore();

@@ -3,7 +3,7 @@ import { addTask, pruneSyncedTasksMissingOnServer } from "@/infrastructure/lib/i
 import type { Task } from "@/shared/types/task";
 import { normalizeSubtasks } from "@/shared/lib/subtasks";
 
-const API_BASE = `http://${window.location.hostname}:4000`;
+const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
 function getErrorMessage(data: { error?: string; message?: string } | null | undefined, fallback: string) {
   return data?.error || data?.message || fallback;
