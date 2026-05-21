@@ -1,3 +1,4 @@
+import "../config/env.js";
 import { connectDB } from "../mongo/mongo.js";
 import { registerCronJobs } from "./cleanupJobs.js";
 

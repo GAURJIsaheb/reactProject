@@ -59,6 +59,10 @@ async function pollQueue() {
 
 export function startConsumer() {
   if (isRunning) return;
+  if (!QUEUE_URL) {
+    console.log("SQS_QUEUE_URL not set - skipping SQS consumer startup");
+    return;
+  }
   isRunning = true;
   console.log('🔁 SQS Consumer started — polling queue...');
   pollQueue();

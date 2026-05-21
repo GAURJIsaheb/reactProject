@@ -1,3 +1,5 @@
+import "../config/env.js";
+
 import mongoose from 'mongoose';
 import dns from 'dns';
 

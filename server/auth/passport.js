@@ -6,7 +6,7 @@ import { db } from "../mongo/mongo.js";
 import dotenv from "dotenv";
 dotenv.config();
 
-const SECRET = process.env.SECRET;
+const SECRET = process.env.JWT_SECRET ?? process.env.SECRET;
 
 
 // ─── Local Strategy (for login) ───────────────────────────────────────────

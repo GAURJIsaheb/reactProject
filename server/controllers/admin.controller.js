@@ -213,7 +213,7 @@ async function runAnalyticsQueries(scope) {
       },
     ]),
 
-    User.countDocuments({ createdAt: { $gte: startAt, $lt: endAt } }),
+    User.countDocuments(),
 
     Task.aggregate([
       {

@@ -1,3 +1,4 @@
+import './config/env.js';
 import { createServer }    from './indexSetup.js';
 import { registerRoutes }   from './routes/index.js';
 import { connectDB }        from './mongo/mongo.js';
@@ -31,8 +32,9 @@ async function start() {
   wsServer.startHeartbeat();
   app.set('wsServer', wsServer); //so any route can access wsServer                           
 
-  httpServer.listen(4000, () =>
-    console.log('Server on 4000 + Mongo + WebSocket')
+  const port = Number(process.env.PORT) || 4000;
+  httpServer.listen(port, () =>
+    console.log(`Server on ${port} + Mongo + WebSocket`)
   );
 }
 
